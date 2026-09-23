@@ -253,6 +253,14 @@ class NW_Logger : public NW_Sensor
     virtual String dataHeader() = 0; ///< The data file's header row: the on-board columns, Header, Note.
     virtual void sleepNow() = 0;     ///< Power down between events and come back with the card ready.
 
+    // --- begin() in pieces: a board's begin() calls these in order around its own steps ---
+    void acceptAddresses(uint8_t *vals, uint8_t numVals, String header_); ///< The sketch's sensor addresses (truncated to 128) and header, plus the ext-int column
+    bool readIdentity();     ///< Pages 0-1 from EEPROM; SN and HWVersion from Page 0 (Schema 1) or the last 8 bytes (Schema 0). Returns whether Page 0 is valid; latches Page0Invalid if not
+    void serialTimeSet();    ///< A YYMMDDHHMMSS string waiting on Serial sets the clock (notice ClockSet); prints the timestamp
+    void attachLoggerInterrupts(bool buttonOnPCINT); ///< LED pins, SD chip select, file times, the alarm ISR and the log button (INT0 or PCINT)
+    void ledReport();        ///< The self-test flags on the RGB LED, then "Ready to Log"
+    void attachExtInt();     ///< The external-interrupt counter, if setExtInt() named a pin
+
     void blinkGood();
     virtual void writeDataToSD();
     virtual void buttonLog();

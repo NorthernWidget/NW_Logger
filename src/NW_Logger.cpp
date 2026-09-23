@@ -29,6 +29,165 @@ ISR (PCINT0_vect) { // handle pin change interrupt for D24-D31 (Port A) on ATmeg
   manualLog = true;
 }
 
+// --- begin() in pieces: a board's begin() calls these in order around its own steps ---
+
+void NW_Logger::acceptAddresses(uint8_t *vals, uint8_t numVals, String header_) {
+  i2cTruncated = (numVals > sizeof(I2C_ADR));
+  NumADR = min(numVals, (uint8_t)sizeof(I2C_ADR));
+  for (uint8_t i = 0; i < NumADR; i++) I2C_ADR[i] = vals[i];
+  if (ExtIntPin == 255) {
+    Header = header_; //Copy user defined header
+  }
+  else {
+    Header = header_ + ext_int_header_entry;
+  }
+}
+
+bool NW_Logger::readIdentity() {
+  Serial.print("SN = ");
+  int EEPROMLen = EEPROM.length(); //Copy value for faster access
+  int val = 0; //Value to read temp EEPROM values into
+  int pos = 0; //used to keep track of position in SN string
+  // NW-Device-Specification: the stored image (Page 0 identity, Page 1 calibration) occupies the top 64 bytes of EEPROM, Page 0 first.
+  // Schema 1 (NW-Provision): serial number = Block 2 (offset 0x10-0x17).
+  // Schema 0 (MargaySetup): serial number = the last 8 bytes.
+  int page0 = EEPROMLen - 64; //Schema 1 stored image: Page 0 identity, then Page 1 calibration, at the top of EEPROM (2026-09-23 renumbering)
+  Pages.loadStored(page0); //The logger's own pages: 0 and 1 from EEPROM; 2 and 3 filled at each reading
+  const uint8_t* p0 = Pages.page;
+  bool schema1 = Pages.page0Valid();
+  int snStart = schema1 ? page0 + 0x10 : EEPROMLen - 8;
+  for (int i = snStart; i < snStart + 8; i++) {  //Read out Serial Number
+    val = EEPROM.read(i);  //Read SN values as individual bytes from EEPROM
+    // Load upper and lower nibbles of each EEPROM byte into SN string,
+    // post-incrementing the position index each time
+    SN[pos++] = HexMap[(val >> 4)];
+    SN[pos++] = HexMap[(val % 0x10)];
+    if ((i - snStart) % 2 == 1 && i < snStart + 7) {
+      SN[pos++] = '-';  //Place - between each SN category, post inc pos
+    }
+    SN[19] = '\0'; //Null terminate string
+  }
+
+  Serial.print(SN); //Print compiled string
+  if (schema1) {
+    Serial.print("  (Schema 1, HW v");
+    Serial.print(p0[0x08]); Serial.print("."); Serial.print(p0[0x09]); Serial.print(")");
+    HWVersion = String(p0[0x08]) + "." + String(p0[0x09]); //For the status file's boot row
+  }
+  if (!schema1) Pages.latchFault(0xE3); //Page 0 invalid: unprovisioned or corrupt
+  if (strcmp(SN, "FFFF-FFFF-FFFF-FFFF") == 0)
+    Serial.println("WARNING: no serial number programmed in EEPROM");
+  return schema1;
+}
+
+void NW_Logger::serialTimeSet() {
+  Serial.print("\n\n");
+  Serial.println("\nInitializing...\n"); //DEBUG!
+  delay(100);
+  if (Serial.available()) {  //If time setting info available
+    String dateTimeTemp = Serial.readString();
+    Serial.println(dateTimeTemp);  //DEBUG!
+    int dateTimeVals[6] = {0};
+    for (int i = 0; i < 6; i++) {
+      dateTimeVals[i] = dateTimeTemp.substring(2*i, 2*(i+1)).toInt();
+      Serial.print(i); Serial.print("  "); //DEBUG!
+      Serial.println(dateTimeVals[i]); //DEBUG!
+    }
+    RTC.setTime(2000 + dateTimeVals[0], dateTimeVals[1], dateTimeVals[2],
+                dateTimeVals[3], dateTimeVals[4], dateTimeVals[5]);
+    Pages.latchNotice(0x30); //ClockSet
+  }
+
+  getTime(); //Get time to pass to computer
+  Serial.print("\nTimestamp = ");
+  Serial.println(LogTimeDate);
+}
+
+void NW_Logger::attachLoggerInterrupts(bool buttonOnPCINT) {
+  //Sets up basic initialization required for the system
+  selfPointer = this;
+
+
+  pinMode(RedLED, OUTPUT);
+  pinMode(GreenLED, OUTPUT);
+  pinMode(BlueLED, OUTPUT);
+
+  LED_Color(OFF);
+
+  pinMode(SD_CS, OUTPUT);
+
+  SdFile::dateTimeCallback(dateTimeSD); //Setup SD file time setting
+  // Attach ISR driven by RTC interrupt; triggers data logging each interval
+  attachInterrupt(digitalPinToInterrupt(RTCInt), NW_Logger::isr1, FALLING);
+  if (!buttonOnPCINT) {
+    // Attach ISR driven by manual log button, sets logging flag and logs data
+    attachInterrupt(digitalPinToInterrupt(LogInt), NW_Logger::isr0, FALLING);
+  }
+  else { //Margay v2.0 and up, Okapi: PCINT for log button (LogInt = D28, PA4); enable pin first
+    *digitalPinToPCMSK(LogInt) |= bit(digitalPinToPCMSKbit(LogInt)); // enable
+    PCIFR |= bit(digitalPinToPCICRbit(LogInt)); // clear outstanding interrupt
+    PCICR |= bit(digitalPinToPCICRbit(LogInt)); // enable interrupt group
+  }
+  pinMode(RTCInt, INPUT_PULLUP);
+  pinMode(LogInt, INPUT);
+}
+
+void NW_Logger::ledReport() {
+  digitalWrite(AuxLED, HIGH);
+
+  if (OnBoardError) {
+    LED_Color(RED); //On board failure
+    delay(2000);
+  }
+  if (SensorError) {
+    LED_Color(ORANGE);  //Sensor failure
+    delay(2000);
+  }
+  if (TimeError) {
+    LED_Color(CYAN); //Time set error
+    delay(2000);
+  }
+  if (SDCardMissing) {
+    LED_Color(PURPLE); //Sd card not inserted
+    delay(2000);
+  }
+  // Battery voltage is below level where hardware functionality
+  // can be guaranteed
+  if (BatError) {
+    for (int i = 0; i < 10; i++) {
+      LED_Color(RED);
+      delay(100);
+      LED_Color(OFF);
+      delay(100);
+    }
+  }
+
+  // Battery charge % is at a concerning level; recommend replacing batteries
+  if (BatWarning && !BatError) {
+    for (int i = 0; i < 10; i++) {
+      LED_Color(GOLD); //Low battery charge warning
+      delay(100);
+      LED_Color(OFF);
+      delay(100);
+    }
+  }
+  //Include battery error in test??
+  if (!OnBoardError && !SensorError && !TimeError && !SDCardMissing) {
+    LED_Color(GREEN);
+    delay(2000);
+  }
+
+  Serial.print("\nReady to Log...\n\n");
+}
+
+void NW_Logger::attachExtInt() {
+  if (ExtIntPin != 255) {
+    pinMode(ExtIntPin, INPUT);
+    digitalWrite(ExtIntPin, HIGH);
+    attachInterrupt(digitalPinToInterrupt(ExtIntPin), NW_Logger::isr2, FALLING);
+  }
+}
+
 void NW_Logger::begin(String header_) {
   uint8_t dummy[1] = {0};
   begin(dummy, 0, header_); //Call generalized begin function
