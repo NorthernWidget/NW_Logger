@@ -90,16 +90,19 @@ class NW_Logger : public NW_Sensor
      * @param header_ Comma-separated column header string for the log file,
      *                matching the CSV data returned by the user's update()
      *                function.
+     * @return true when the self-tests found nothing wrong (Okapi's convention;
+     *         Margay sketches may ignore it as before).
      */
-    virtual void begin(uint8_t *vals, uint8_t numVals, String header_) = 0;
+    virtual bool begin(uint8_t *vals, uint8_t numVals, String header_) = 0;
 
     /**
      * @brief Initialise the logger with no external I2C sensors.
      * @details Convenience overload; equivalent to calling
      * begin(empty_array, 0, header_). Logs only on-board sensor values.
      * @param header_ Optional column header string (default empty).
+     * @return what begin(vals, numVals, header_) returns.
      */
-    void begin(String header_ = "");
+    bool begin(String header_ = "");
 
     /**
      * @brief Write a string to the SD card log file and echo it to Serial.
@@ -252,6 +255,7 @@ class NW_Logger : public NW_Sensor
     // --- the hooks a board's library fills in ---
     virtual String dataHeader() = 0; ///< The data file's header row: the on-board columns, Header, Note.
     virtual void sleepNow() = 0;     ///< Power down between events and come back with the card ready.
+    virtual void afterLogEvent() {}  ///< Called by run() after an alarm-driven row is written (Okapi: the backhaul).
 
     // --- begin() in pieces: a board's begin() calls these in order around its own steps ---
     void acceptAddresses(uint8_t *vals, uint8_t numVals, String header_); ///< The sketch's sensor addresses (truncated to 128) and header, plus the ext-int column
@@ -325,6 +329,8 @@ class NW_Logger : public NW_Sensor
     SdFat SD;
     byte  keep_SPCR;
     byte keep_ADCSRA;
+    uint32_t SDIndex = 0; // the byte position in the data file after the last row, for a logger that reads rows back (Okapi's backhaul)
+    uint32_t clockUnix(); // Unix seconds from the DS3231's fields, for Page 2 Block 3
 };
 
 #endif

@@ -188,9 +188,9 @@ void NW_Logger::attachExtInt() {
   }
 }
 
-void NW_Logger::begin(String header_) {
+bool NW_Logger::begin(String header_) {
   uint8_t dummy[1] = {0};
-  begin(dummy, 0, header_); //Call generalized begin function
+  return begin(dummy, 0, header_); //Call generalized begin function
 }
 
 void NW_Logger::I2Ctest() {
@@ -387,6 +387,7 @@ int NW_Logger::logStr(String val) {
   // if the file is available, write to it:
   if (DataFile) {
     DataFile.println(val);
+    SDIndex = DataFile.position(); //Where the next row starts, for a logger that reads rows back
     DataFile.close();
     return 0;
   }
@@ -427,6 +428,18 @@ void NW_Logger::LED_Color(unsigned long val) { //Set color of onboard led
   analogWrite(RedLED, 255 - (red * lum)/0xFF);
   analogWrite(GreenLED, 255 - (green * lum)/0xFF);
   analogWrite(BlueLED, 255 - (blue * lum)/0xFF);
+}
+
+uint32_t NW_Logger::clockUnix() {
+  //Clock: Unix seconds from the DS3231's fields (days from civil, proleptic Gregorian)
+  int y = RTC.getValue(0), mo = RTC.getValue(1), d = RTC.getValue(2);
+  int32_t yy = y - (mo <= 2 ? 1 : 0);
+  int32_t era = (yy >= 0 ? yy : yy - 399) / 400;
+  uint32_t yoe = (uint32_t)(yy - era * 400);
+  uint32_t doy = (153 * (mo + (mo > 2 ? -3 : 9)) + 2) / 5 + d - 1;
+  uint32_t doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+  uint32_t days = (uint32_t)(era * 146097 + (int32_t)doe - 719468);
+  return days * 86400UL + (uint32_t)RTC.getValue(3) * 3600UL + (uint32_t)RTC.getValue(4) * 60UL + (uint32_t)RTC.getValue(5);
 }
 
 void NW_Logger::getTime() {
@@ -470,6 +483,7 @@ void NW_Logger::run(String (*update)(void), unsigned long logInterval) {
     // Serial.println("Log Event!"); //DEBUG!
     // RTC.setAlarm(logInterval);  //Set/reset alarm //DEBUG!
     addDataPoint(update); //Write values to SD
+    afterLogEvent(); //A board's follow-up to the alarm-driven row (Okapi's backhaul)
     LogEvent = false; //Clear log flag
     RTC.setAlarm(logInterval);  //Set/reset alarm
     resetWDT(); //Clear alarm
