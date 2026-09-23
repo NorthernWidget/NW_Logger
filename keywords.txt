@@ -1,0 +1,45 @@
+#######################################
+# Syntax Coloring Map: NW_Logger
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+NW_Logger	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+begin			KEYWORD2
+logStr			KEYWORD2
+statusStr		KEYWORD2
+watch			KEYWORD2
+note			KEYWORD2
+LED_Color		KEYWORD2
+run			KEYWORD2
+addDataPoint		KEYWORD2
+initLogFile		KEYWORD2
+setExtInt		KEYWORD2
+getExtIntCount		KEYWORD2
+resetExtIntCount	KEYWORD2
+resetWDT		KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+
+RED		LITERAL1
+GREEN		LITERAL1
+BLUE		LITERAL1
+MAROON		LITERAL1
+GOLD		LITERAL1
+ORANGE		LITERAL1
+PURPLE		LITERAL1
+CYAN		LITERAL1
+BLACK_ALERT	LITERAL1
+ON		LITERAL1
+OFF		LITERAL1
+NW_LOGGER_LIBRARY_VERSION	LITERAL1
+NW_LOGGER_LIBRARY_COMMIT	LITERAL1
