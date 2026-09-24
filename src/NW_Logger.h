@@ -230,7 +230,8 @@ class NW_Logger : public NW_Sensor
 
     /**
      * @brief Pulse the external watchdog timer's DONE pin.
-     * @details Call periodically to prevent a hardware watchdog reset.
+     * @details Pulses WDHold HIGH for 5 µs to feed the hardware watchdog.
+     * Call periodically to prevent a hardware watchdog reset.
      * Does nothing when WDHold is 255 (no watchdog on this board model).
      */
     void resetWDT();
