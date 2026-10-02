@@ -562,7 +562,10 @@ void NW_Logger::farmGateI2C(bool initStateI2C) {
 uint8_t NW_Logger::reportKind()    { return _pages.report().kind(); }
 bool    NW_Logger::reportIsFault() { return _pages.report().isFault(); }
 uint8_t NW_Logger::bootReportKind() { return _bootReport.kind(); }
-void    NW_Logger::clearBootReport() { _bootReport.code = 0; _bootReport.status = 0; }
+void    NW_Logger::clearBootReport() {
+  _bootReport.code = 0;
+  _bootReport.status = 0;
+}
 
 size_t NW_Logger::printFileHeader(Print& out) {
   //The logger's own columns first, then each watched sensor's in watch order,
@@ -613,7 +616,8 @@ int NW_Logger::statusRow(const char* trigger, NW_Sensor& sensor, bool boot) {
   _sd.chdir(_sn);  //Move into this logger's folder, named by its serial number
   File StatusFile = _sd.open(_fileNameStaC, FILE_WRITE);
   if (!StatusFile) return -1;
-  StatusFile.print(_logTimeDate); StatusFile.print(',');
+  StatusFile.print(_logTimeDate);
+  StatusFile.print(',');
   StatusFile.print(trigger); StatusFile.print(',');
   sensor.printStatus(StatusFile, boot);
   StatusFile.println();
