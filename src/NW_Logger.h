@@ -73,10 +73,10 @@ Andy Wickert
 // Interrupt-shared state, defined in NW_Logger.cpp: the ISRs set them, run()
 // clears them, and a board's begin() reads the external-interrupt pin and header.
 extern volatile bool manualLog;
-extern volatile uint8_t ExtIntPin;
+extern volatile uint8_t extIntPin;
 extern String ext_int_header_entry;
-extern volatile bool ExtIntTripped;
-extern volatile uint16_t ExtInt_count;
+extern volatile bool extIntTripped;
+extern volatile uint16_t extIntCount;
 
 class NW_Logger : public NW_Sensor
 {
@@ -127,7 +127,7 @@ class NW_Logger : public NW_Sensor
      * sensor captured at its boot other than the reset a logger expects when it
      * powers the rail (trigger "boot"). The first reading writes a boot row for
      * every watched sensor, whatever it says, so the file records each device's
-     * identity and versions. Up to MaxWatched sensors.
+     * identity and versions. Up to MAX_WATCHED sensors.
      * @return false if the list is full
      */
     bool watch(NW_Sensor& sensor);
@@ -146,7 +146,7 @@ class NW_Logger : public NW_Sensor
 
     /**
      * @brief The data file's header row as a String: the on-board columns,
-     * Header, Note.
+     * _header, and the Note column.
      * @details The sketch-composed path, kept while a sketch still passes a
      * header to begin(). printFileHeader() is the same row walked from the
      * watched sensors instead.
@@ -293,7 +293,7 @@ class NW_Logger : public NW_Sensor
 
     // --- begin() in pieces: a board's begin() calls these in order around its own steps ---
     void acceptAddresses(uint8_t *vals, uint8_t numVals, String header_); ///< The sketch's sensor addresses (truncated to 128) and header, plus the ext-int column
-    bool readIdentity();     ///< Pages 0-1 from EEPROM; SN and HWVersion from Page 0 (Schema 1) or the last 8 bytes (Schema 0). Returns whether Page 0 is valid; latches Page0Invalid if not
+    bool readIdentity();     ///< Pages 0-1 from EEPROM; _sn and _hwVersion from Page 0 (Schema 1) or the last 8 bytes (Schema 0). Returns whether Page 0 is valid; latches Page0Invalid if not
     void serialTimeSet();    ///< A YYMMDDHHMMSS string waiting on Serial sets the clock (notice ClockSet); prints the timestamp
     void attachLoggerInterrupts(bool buttonOnPCINT); ///< LED pins, SD chip select, file times, the alarm ISR and the log button (INT0 or PCINT)
     void ledReport();        ///< The self-test flags on the RGB LED, then "Ready to Log"
@@ -315,55 +315,55 @@ class NW_Logger : public NW_Sensor
     void extIntCounter();
     void farmGateI2C(bool initialStateExternalI2C);
 
-    DS3231_Logger RTC;
+    DS3231_Logger _rtc;
     BME bme280;
 
-    String LogTimeDate = "2063/04/05 20:00:00";
+    String _logTimeDate = "2063/04/05 20:00:00";
     bool i2cTruncated = false; // true if numVals passed to begin() exceeded I2C_ADR capacity
-    bool OnBoardError = false;
-    bool SensorError = false;
-    bool TimeError = false;
-    bool SDCardMissing = false;
-    bool BatError = false;
-    bool BatWarning = false;
-    String Header = "";
-    String Note = ""; // pending word(s) for the Note column of the next row
-    const char HexMap[16] = {
+    bool _onBoardError = false;
+    bool _sensorError = false;
+    bool _timeError = false;
+    bool _sdCardMissing = false;
+    bool _batError = false;
+    bool _batWarning = false;
+    String _header = "";
+    String _note = ""; // pending word(s) for the Note column of the next row
+    const char HEX_MAP[16] = {
       '0', '1', '2', '3', '4', '5', '6', '7',
       '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
     }; // hex digit lookup table
-    char SN[20] = {0}; // serial number: 19 chars + null terminator
-    uint8_t NumADR = 0;
-    uint8_t I2C_ADR[128] = {0}; // one slot per usable 7-bit I2C address
-    uint8_t NumADR_OB = 1;
-    uint8_t I2C_ADR_OB[6] = {0x68}; // on-board chips, the clock first; a board fills the rest (Margay two, Okapi six)
+    char _sn[20] = {0}; // serial number: 19 chars + null terminator
+    uint8_t _numAdr = 0;
+    uint8_t _i2cAdr[128] = {0}; // one slot per usable 7-bit I2C address
+    uint8_t _numAdrOb = 1;
+    uint8_t _i2cAdrOb[6] = {0x68}; // on-board chips, the clock first; a board fills the rest (Margay two, Okapi six)
 
-    volatile bool LogEvent = false; //Used to test if logging should begin yet
-    volatile bool NewLog = false; //Used to tell system to start a new log
-    volatile int AwakeCount = 0;
+    volatile bool _logEvent = false; //Used to test if logging should begin yet
+    volatile bool _newLog = false; //Used to tell system to start a new log
+    volatile int _awakeCount = 0;
 
-    char FileNameC[13]; // "logNNNNN.csv" (12 chars) + null terminator
-    char FileNameStaC[13]; // "staNNNNN.csv", the status file with the same number
-    static const uint8_t MaxWatched = 8;
-    NW_Pages Pages;         // the logger's own Schema 1 pages: 0-1 from EEPROM, 2-3 its reading of itself
-    NW_Report BootReport;   // what the logger reported at boot, until its row is written
-    bool SDTestFailed = false; // the boot write-and-read-back on the card failed
-    bool ClockError = false; // the DS3231 did not answer, or its oscillator is stopped
-    bool BMEError = false;   // the BME280 did not answer
-    unsigned long LogInterval = 0; // seconds, from run(); served on Page 3
-    uint16_t FileNum = 0;   // the number of the current log and status file pair
-    NW_Sensor* Watched[MaxWatched]; // sensors whose reports go to the status file (watch())
-    uint8_t NumWatched = 0;
-    bool DeviceBootRows = false; // the first reading's boot rows have been written
+    char _fileNameC[13]; // "logNNNNN.csv" (12 chars) + null terminator
+    char _fileNameStaC[13]; // "staNNNNN.csv", the status file with the same number
+    static const uint8_t MAX_WATCHED = 8;
+    NW_Pages _pages;         // the logger's own Schema 1 pages: 0-1 from EEPROM, 2-3 its reading of itself
+    NW_Report _bootReport;   // what the logger reported at boot, until its row is written
+    bool _sdTestFailed = false; // the boot write-and-read-back on the card failed
+    bool _clockError = false; // the DS3231 did not answer, or its oscillator is stopped
+    bool _bmeError = false;   // the BME280 did not answer
+    unsigned long _logInterval = 0; // seconds, from run(); served on Page 3
+    uint16_t _fileNum = 0;   // the number of the current log and status file pair
+    NW_Sensor* _watched[MAX_WATCHED]; // sensors whose reports go to the status file (watch())
+    uint8_t _numWatched = 0;
+    bool _deviceBootRows = false; // the first reading's boot rows have been written
     int statusRow(const char* trigger, NW_Sensor& sensor, bool boot); // one device row: time, trigger, printStatus()
     void reportRows(); // after a reading: the rows the watched sensors' reports call for
-    String HWVersion = ""; // "3.0" from Page 0 (Schema 1), else the model number; for the status file's boot row
-    char FileNameTestC[11]; // "HWTest.txt" (10 chars) + null terminator
+    String _hwVersion = ""; // "3.0" from Page 0 (Schema 1), else the model number; for the status file's boot row
+    char _fileNameTestC[11]; // "HWTest.txt" (10 chars) + null terminator
     bool externalI2COn = false;
-    SdFat SD;
+    SdFat _sd;
     byte  keep_SPCR;
     byte keep_ADCSRA;
-    uint32_t SDIndex = 0; // the byte position in the data file after the last row, for a logger that reads rows back (Okapi's backhaul)
+    uint32_t _sdIndex = 0; // the byte position in the data file after the last row, for a logger that reads rows back (Okapi's backhaul)
     uint32_t clockUnix(); // Unix seconds from the DS3231's fields, for Page 2 Block 3
 };
 
