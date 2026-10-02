@@ -132,6 +132,35 @@ class NW_Logger : public NW_Sensor
      */
     bool watch(NW_Sensor& sensor);
 
+    /**
+     * @brief Print the data file's whole header row: this logger's own columns,
+     * then each watched sensor's in watch order, then the external-interrupt
+     * column, then Note.
+     * @details No row is composed in RAM. Pass the open file and each sensor
+     * writes its own columns into it (LIBRARY-DESIGN.md section 14). Watch
+     * order is column order, which is visible in the sketch's setup().
+     * @param out Where to print.
+     * @return Bytes printed.
+     */
+    size_t printFileHeader(Print& out);
+
+    /**
+     * @brief The data file's header row as a String: the on-board columns,
+     * Header, Note.
+     * @details The sketch-composed path, kept while a sketch still passes a
+     * header to begin(). printFileHeader() is the same row walked from the
+     * watched sensors instead.
+     */
+    String dataHeader();
+
+    /**
+     * @brief The logger's own columns for one row: read the board's channels,
+     * then print them.
+     * @details readOnBoard() is where a board differs; everything after it is
+     * the same on every logger, which is why this lives here.
+     */
+    String getOnBoardVals();
+
     // --- NW_Sensor: the logger is a Schema 1 device and watches itself ---
     /** @brief Kind of the logger's own report latched during the last reading (0 = none). */
     uint8_t reportKind() override;
@@ -254,7 +283,11 @@ class NW_Logger : public NW_Sensor
 
   protected:
     // --- the hooks a board's library fills in ---
-    virtual String dataHeader() = 0; ///< The data file's header row: the on-board columns, Header, Note.
+
+
+
+    /** @brief Read this board's own channels into its members. Board-specific. */
+    virtual void readOnBoard() = 0;
     virtual void sleepNow() = 0;     ///< Power down between events and come back with the card ready.
     virtual void afterLogEvent() {}  ///< Called by run() after an alarm-driven row is written (Okapi: the backhaul).
 

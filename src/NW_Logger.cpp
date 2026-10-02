@@ -564,6 +564,44 @@ bool    NW_Logger::reportIsFault() { return Pages.report().isFault(); }
 uint8_t NW_Logger::bootReportKind() { return BootReport.kind(); }
 void    NW_Logger::clearBootReport() { BootReport.code = 0; BootReport.status = 0; }
 
+size_t NW_Logger::printFileHeader(Print& out) {
+  // The logger's own columns first, then each watched sensor's in watch order,
+  // which is also column order. Note is always the last column and carries no
+  // comma after it: every sensor ends its fields with a comma for the next, so
+  // this ends the row.
+  size_t n = printDataHeader(out);
+  for (uint8_t i = 0; i < NumWatched; i++) {
+    // A sketch may watch the logger for the status file. Its columns are
+    // already written above, and printing them twice would be silent.
+    if (Watched[i] == this) continue;
+    n += Watched[i]->printDataHeader(out);
+  }
+  if (ExtIntPin != 255) n += out.print(ext_int_header_entry);
+  n += out.print("Note");
+  return n;
+}
+
+String NW_Logger::dataHeader() {
+  // Note is always the last column and carries no comma after it: every
+  // sensor ends its fields with a comma for the next, so this ends the row.
+  String h;
+  NW_StringPrint p(h);
+  printDataHeader(p);
+  h += Header;
+  h += "Note";
+  return h;
+}
+
+String NW_Logger::getOnBoardVals() {
+  // The reading, then the row: printDataRow() prints what readOnBoard() left,
+  // which is what lets the same row reach two sinks without reading twice.
+  readOnBoard();
+  String s;
+  NW_StringPrint p(s);
+  printDataRow(p);
+  return s;
+}
+
 bool NW_Logger::watch(NW_Sensor& sensor) {
   if (NumWatched >= MaxWatched) return false;
   Watched[NumWatched++] = &sensor;
