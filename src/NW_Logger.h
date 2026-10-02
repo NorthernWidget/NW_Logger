@@ -127,7 +127,7 @@ class NW_Logger : public NW_Sensor
      * sensor captured at its boot other than the reset a logger expects when it
      * powers the rail (trigger "boot"). The first reading writes a boot row for
      * every watched sensor, whatever it says, so the file records each device's
-     * identity and versions. Up to MAX_WATCHED sensors.
+     * identity and versions. Up to MAX_SENSORS of them.
      * @return false if the list is full
      */
     bool watch(NW_Sensor& sensor);
@@ -344,7 +344,7 @@ class NW_Logger : public NW_Sensor
 
     char _fileNameC[13]; // "logNNNNN.csv" (12 chars) + null terminator
     char _fileNameStaC[13]; // "staNNNNN.csv", the status file with the same number
-    static const uint8_t MAX_WATCHED = 8;
+    static const uint8_t MAX_SENSORS = 8;
     NW_Pages _pages;         // the logger's own Schema 1 pages: 0-1 from EEPROM, 2-3 its reading of itself
     NW_Report _bootReport;   // what the logger reported at boot, until its row is written
     bool _sdTestFailed = false; // the boot write-and-read-back on the card failed
@@ -352,8 +352,8 @@ class NW_Logger : public NW_Sensor
     bool _bmeError = false;   // the BME280 did not answer
     unsigned long _logInterval = 0; // seconds, from run(); served on Page 3
     uint16_t _fileNum = 0;   // the number of the current log and status file pair
-    NW_Sensor* _watched[MAX_WATCHED]; // sensors whose reports go to the status file (watch())
-    uint8_t _numWatched = 0;
+    NW_Sensor* _sensors[MAX_SENSORS]; // sensors whose reports go to the status file (watch())
+    uint8_t _numSensors = 0;
     bool _deviceBootRows = false; // the first reading's boot rows have been written
     int statusRow(const char* trigger, NW_Sensor& sensor, bool boot); // one device row: time, trigger, printStatus()
     void reportRows(); // after a reading: the rows the watched sensors' reports call for

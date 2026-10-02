@@ -570,11 +570,11 @@ size_t NW_Logger::printFileHeader(Print& out) {
   // comma after it: every sensor ends its fields with a comma for the next, so
   // this ends the row.
   size_t n = printDataHeader(out);
-  for (uint8_t i = 0; i < _numWatched; i++) {
+  for (uint8_t i = 0; i < _numSensors; i++) {
     // A sketch may watch the logger for the status file. Its columns are
     // already written above, and printing them twice would be silent.
-    if (_watched[i] == this) continue;
-    n += _watched[i]->printDataHeader(out);
+    if (_sensors[i] == this) continue;
+    n += _sensors[i]->printDataHeader(out);
   }
   if (extIntPin != 255) n += out.print(ext_int_header_entry);
   n += out.print("Note");
@@ -603,8 +603,8 @@ String NW_Logger::getOnBoardVals() {
 }
 
 bool NW_Logger::watch(NW_Sensor& sensor) {
-  if (_numWatched >= MAX_WATCHED) return false;
-  _watched[_numWatched++] = &sensor;
+  if (_numSensors >= MAX_SENSORS) return false;
+  _sensors[_numSensors++] = &sensor;
   return true;
 }
 
@@ -626,8 +626,8 @@ void NW_Logger::reportRows() {
   //powering the rail for the reading: no row. Any other boot report, and any
   //report captured with the reading, gets one. The first reading writes every
   //watched sensor's boot row regardless, as the record of what is on the bus.
-  for (int8_t i = -1; i < (int8_t)_numWatched; i++) {
-    NW_Sensor& s = (i < 0) ? *this : *_watched[i]; //The logger itself first
+  for (int8_t i = -1; i < (int8_t)_numSensors; i++) {
+    NW_Sensor& s = (i < 0) ? *this : *_sensors[i]; //The logger itself first
     uint8_t bootKind = s.bootReportKind();
     if (!_deviceBootRows || (bootKind != 0 && bootKind != 6)) statusRow("boot", s, true);
     s.clearBootReport();
