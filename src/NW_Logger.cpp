@@ -565,14 +565,14 @@ uint8_t NW_Logger::bootReportKind() { return _bootReport.kind(); }
 void    NW_Logger::clearBootReport() { _bootReport.code = 0; _bootReport.status = 0; }
 
 size_t NW_Logger::printFileHeader(Print& out) {
-  // The logger's own columns first, then each watched sensor's in watch order,
-  // which is also column order. Note is always the last column and carries no
-  // comma after it: every sensor ends its fields with a comma for the next, so
-  // this ends the row.
+  //The logger's own columns first, then each watched sensor's in watch order,
+  //which is also column order. Note is always the last column and carries no
+  //comma after it: every sensor ends its fields with a comma for the next, so
+  //this ends the row.
   size_t n = printDataHeader(out);
   for (uint8_t i = 0; i < _numSensors; i++) {
-    // A sketch may watch the logger for the status file. Its columns are
-    // already written above, and printing them twice would be silent.
+    //A sketch may watch the logger for the status file. Its columns are
+    //already written above, and printing them twice would be silent.
     if (_sensors[i] == this) continue;
     n += _sensors[i]->printDataHeader(out);
   }
@@ -582,8 +582,8 @@ size_t NW_Logger::printFileHeader(Print& out) {
 }
 
 String NW_Logger::dataHeader() {
-  // Note is always the last column and carries no comma after it: every
-  // sensor ends its fields with a comma for the next, so this ends the row.
+  //Note is always the last column and carries no comma after it: every
+  //sensor ends its fields with a comma for the next, so this ends the row.
   String h;
   NW_StringPrint p(h);
   printDataHeader(p);
@@ -593,8 +593,8 @@ String NW_Logger::dataHeader() {
 }
 
 String NW_Logger::getOnBoardVals() {
-  // The reading, then the row: printDataRow() prints what readOnBoard() left,
-  // which is what lets the same row reach two sinks without reading twice.
+  //The reading, then the row: printDataRow() prints what readOnBoard() left,
+  //which is what lets the same row reach two sinks without reading twice.
   readOnBoard();
   String s;
   NW_StringPrint p(s);
