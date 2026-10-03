@@ -193,7 +193,7 @@ class NW_Logger : public NW_Sensor
      * Typical words: NotAnswering, OldFirmware, NotSchema1, LiDARTimeout.
      * @param word One word (no commas) naming the condition.
      */
-    void note(const String& word);
+    void note(const char* word);
 
     /**
      * @brief Set the on-board RGB LED to a packed color value.
@@ -350,7 +350,10 @@ class NW_Logger : public NW_Sensor
     DS3231_Logger _rtc;
     BME bme280;
 
-    String _logTimeDate = "2063/04/05 20:00:00";
+    static const uint16_t NOTE_CAPACITY = 256;  ///< MAX_SENSORS words of a chip name plus a kind, with separators (256 does not fit a uint8_t)
+    char _note[NOTE_CAPACITY] = {0};  // pending word(s) for the Note column of the next row
+    char _logTimeDate[20] = "2063/04/05 20:00:00";   // always nineteen characters
+    char _hwVersion[8] = {0};         // "255.255" at widest, from Page 0's two version bytes
     bool i2cTruncated = false; // true if numVals passed to begin() exceeded I2C_ADR capacity
     bool _onBoardError = false;
     bool _sensorError = false;
@@ -358,7 +361,6 @@ class NW_Logger : public NW_Sensor
     bool _sdCardMissing = false;
     bool _batError = false;
     bool _batWarning = false;
-    String _note = ""; // pending word(s) for the Note column of the next row
     const char HEX_MAP[16] = {
       '0', '1', '2', '3', '4', '5', '6', '7',
       '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
@@ -389,7 +391,6 @@ class NW_Logger : public NW_Sensor
     bool _deviceBootRows = false; // the first reading's boot rows have been written
     int statusRow(const char* trigger, NW_Sensor& sensor, bool boot); // one device row: time, trigger, printStatus()
     void reportRows(); // after a reading: the rows the watched sensors' reports call for
-    String _hwVersion = ""; // "3.0" from Page 0 (Schema 1), else the model number; for the status file's boot row
     char _fileNameTestC[11]; // "HWTest.txt" (10 chars) + null terminator
     bool externalI2COn = false;
     SdFat _sd;

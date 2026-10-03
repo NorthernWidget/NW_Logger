@@ -66,7 +66,7 @@ bool NW_Logger::readIdentity() {
   if (schema1) {
     Serial.print("  (Schema 1, HW v");
     Serial.print(p0[0x08]); Serial.print("."); Serial.print(p0[0x09]); Serial.print(")");
-    _hwVersion = String(p0[0x08]) + "." + String(p0[0x09]); //For the status file's boot row
+    snprintf(_hwVersion, sizeof(_hwVersion), "%u.%u", p0[0x08], p0[0x09]); //For the status file's boot row
   }
   if (!schema1) _pages.latchFault(0xE3); //Page 0 invalid: unprovisioned or corrupt
   if (strcmp(_sn, "FFFF-FFFF-FFFF-FFFF") == 0)
@@ -434,7 +434,8 @@ uint32_t NW_Logger::clockUnix() {
 
 void NW_Logger::getTime() {
   //Update global time string
-  _logTimeDate = _rtc.getTime(0);
+  //getTime() answers a String; copy it into the buffer the rows print from.
+  strlcpy(_logTimeDate, _rtc.getTime(0).c_str(), sizeof(_logTimeDate));
 }
 
 void NW_Logger::blinkGood() {
@@ -579,9 +580,10 @@ size_t NW_Logger::printFileHeader(Print& out) {
 
 void NW_Logger::noteFrom(NW_Sensor& sensor, bool beginFailed) {
   //One sensor's word into the Note column, semicolon-separated as note() does.
-  if (_note.length() > 0) _note += ";";
-  NW_StringPrint p(_note);
+  NW_BufferPrint p(_note, NOTE_CAPACITY, true);   //append to this row's notes
+  if (p.length() > 0) p.print(';');
   sensor.printNote(p, beginFailed);
+  if (p.truncated()) _pages.latchNotice(0xF3);   //NoteTruncated: the row's notes did not fit
   Serial.print(F("Note: "));
   Serial.println(_note);
 }
@@ -630,7 +632,7 @@ int NW_Logger::logRow() {
     _sensors[i]->printDataRow(Serial);
   }
   Serial.println(_note);
-  _note = "";                         //One row's worth of notes
+  _note[0] = '\0';                     //One row's worth of notes
   return 0;
 }
 
@@ -672,9 +674,11 @@ void NW_Logger::reportRows() {
   _deviceBootRows = true;
 }
 
-void NW_Logger::note(const String& word) {
-  if (_note.length() > 0) _note += ";";
-  _note += word;
+void NW_Logger::note(const char* word) {
+  NW_BufferPrint p(_note, NOTE_CAPACITY, true);
+  if (p.length() > 0) p.print(';');
+  p.print(word);
+  if (p.truncated()) _pages.latchNotice(0xF3);   //NoteTruncated
   Serial.print(F("Note: "));
   Serial.println(word);
   LED_Color(ORANGE);
