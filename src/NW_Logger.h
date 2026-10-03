@@ -175,6 +175,28 @@ class NW_Logger : public NW_Sensor
      */
     uint8_t scan(Print& out);
 
+    /**
+     * @brief Watch whatever the bus holds: ask it what is attached, and hold
+     * each device with the library that answers to its name.
+     * @details The walk scan() makes, answered with watch() instead of a line
+     * of text. Every device that answers has its Page 0 read and checked, and a
+     * device that passes has named itself (NW-Device-Specification Page 0);
+     * `candidates[i]->name()` is the same name as a compile-time literal, so the
+     * table needs no names of its own. A match is watched at the address it
+     * answered on, which may not be its default, and address order is therefore
+     * column order (LIBRARY-DESIGN.md section 16).
+     *
+     * Call this instead of watch() in setup(), or beside it. One object holds
+     * one address at a time, so two boards of the same kind need two slots in
+     * the table. The bus is walked while slots remain: a logger holds
+     * MAX_SENSORS sensors, and the return value says how many it took.
+     * @param candidates the libraries that may be on the bus, each already
+     *        constructed and outliving the logger's use of it.
+     * @param n how many candidates there are.
+     * @return How many devices were found and watched.
+     */
+    uint8_t discover(NW_Sensor** candidates, uint8_t n);
+
     size_t printFileHeader(Print& out);
 
     /**
@@ -356,6 +378,9 @@ class NW_Logger : public NW_Sensor
     static NW_Logger* selfPointer;
     static void dateTimeSD(uint16_t* date, uint16_t* time);
     void switchExternalI2C(bool desiredState);
+    bool answers(uint8_t address);                     ///< Does anything hold that address?
+    bool readPage0(uint8_t address, NW_Pages& pages);  ///< Read Page 0 from it; true when the page passes its checks
+    bool watching(NW_Sensor& sensor);                  ///< Is that sensor already held?
     void getTime();
     void I2Ctest();
     void SDtest();

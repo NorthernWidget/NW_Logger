@@ -559,6 +559,46 @@ void    NW_Logger::clearBootReport() {
   _bootReport.status = 0;
 }
 
+//Does anything hold that address? One empty transmission, which is what
+//I2Ctest() has always asked the bus.
+bool NW_Logger::answers(uint8_t address) {
+  Wire.beginTransmission(address);
+  return Wire.endTransmission() == 0;
+}
+
+//Page 0 in one transaction: the firmware serves it from EEPROM, so it is valid
+//before the device has taken a reading. True when the page is there and passes
+//the schema, magic and CRC-8 gates, which is what makes a device self-naming.
+bool NW_Logger::readPage0(uint8_t address, NW_Pages& pages) {
+  Wire.beginTransmission(address);
+  Wire.write((uint8_t)0x00);
+  if (Wire.endTransmission() != 0) return false;
+  if (Wire.requestFrom(address, (uint8_t)32) != 32) return false;
+  for (uint8_t i = 0; i < 32; i++) pages.page[i] = Wire.read();
+  return pages.page0Valid();
+}
+
+//Is the name in this Page 0 the name this library answers to? The field is
+//seven bytes at 0x01, padded with zeros, and a library's name() is the same
+//spelling as a compile-time literal.
+static bool nameMatches(const uint8_t* page, const char* name) {
+  uint8_t i = 0;
+  for (; i < 7 && name[i]; i++) {
+    if ((char)page[1 + i] != name[i]) return false;
+  }
+  for (; i < 7; i++) {
+    if (page[1 + i] != 0) return false;   //the rest of the field is padding
+  }
+  return true;
+}
+
+bool NW_Logger::watching(NW_Sensor& sensor) {
+  for (uint8_t i = 0; i < _numSensors; i++) {
+    if (_sensors[i] == &sensor) return true;
+  }
+  return false;
+}
+
 uint8_t NW_Logger::scan(Print& out) {
   //The sensor bus, address by address. A device that answers gets its Page 0
   //read and checked; one that passes has named itself, which is what lets a
@@ -570,23 +610,13 @@ uint8_t NW_Logger::scan(Print& out) {
   uint8_t answered = 0, identified = 0;
   out.println(F("I2C scan:"));
   for (uint8_t adr = 0x08; adr <= 0x77; adr++) {
-    Wire.beginTransmission(adr);
-    if (Wire.endTransmission() != 0) continue;
+    if (!answers(adr)) continue;
     answered++;
     out.print(F("  0x"));
     nwPrintHex(out, &adr, 1);
     out.print(F("  "));
 
-    //Page 0 in one transaction: the firmware serves it from EEPROM, so it is
-    //valid before the device has taken a reading.
-    bool read = true;
-    Wire.beginTransmission(adr);
-    Wire.write((uint8_t)0x00);
-    if (Wire.endTransmission() != 0) read = false;
-    if (read && Wire.requestFrom(adr, (uint8_t)32) != 32) read = false;
-    if (read) for (uint8_t i = 0; i < 32; i++) p.page[i] = Wire.read();
-
-    if (!read || !p.page0Valid()) {
+    if (!readPage0(adr, p)) {
       out.println(F("(no valid Page 0)"));
       continue;
     }
@@ -618,6 +648,36 @@ uint8_t NW_Logger::scan(Print& out) {
 
   farmGateI2C(initialStateExternalI2C);
   return answered;
+}
+
+uint8_t NW_Logger::discover(NW_Sensor** candidates, uint8_t n) {
+  //The same walk scan() makes, answered with watch() instead of a line of text.
+  //A device that passes its Page 0 checks has named itself; a candidate whose
+  //name() is that name is the library that reads it, and it is watched at the
+  //address it answered on rather than at its default.
+  bool initialStateExternalI2C = digitalRead(I2C_SW);
+  switchExternalI2C(ON);
+
+  NW_Pages p;                        //borrowed for page0Valid() and its CRC-8
+  uint8_t found = 0;
+  //Address order, which is therefore column order, and the bus is walked only
+  //as far as there are slots left to hold what it finds.
+  for (uint8_t adr = 0x08; adr <= 0x77 && _numSensors < MAX_SENSORS; adr++) {
+    if (!answers(adr)) continue;
+    if (!readPage0(adr, p)) continue;
+    for (uint8_t i = 0; i < n; i++) {
+      if (!nameMatches(p.page, candidates[i]->name())) continue;
+      //One object holds one address at a time, so a second board of the same
+      //kind needs a second slot in the table rather than the same one twice.
+      if (watching(*candidates[i])) continue;
+      watch(*candidates[i], adr);
+      found++;
+      break;
+    }
+  }
+
+  farmGateI2C(initialStateExternalI2C);
+  return found;
 }
 
 size_t NW_Logger::printFileHeader(Print& out) {
