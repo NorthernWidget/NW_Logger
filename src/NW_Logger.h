@@ -159,6 +159,22 @@ class NW_Logger : public NW_Sensor
      * @param out Where to print.
      * @return Bytes printed.
      */
+    /**
+     * @brief Report every device on the sensor bus, and name the Schema 1 ones.
+     * @details Probes each 7-bit address, and for every device that answers
+     * reads Page 0 and checks it: schema byte, magic byte and CRC-8. A device
+     * that passes has named itself, so this prints its name, address, hardware
+     * and firmware versions and serial number; one that answers without a valid
+     * Page 0 is reported as unidentified. Nothing is watched and nothing is
+     * begun (LIBRARY-DESIGN.md section 16).
+     *
+     * This is what answers "what have I plugged in" on the bench, with no
+     * sketch written for the particular sensors.
+     * @param out where to print.
+     * @return How many devices answered, Schema 1 or not.
+     */
+    uint8_t scan(Print& out);
+
     size_t printFileHeader(Print& out);
 
     /**

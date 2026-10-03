@@ -559,6 +559,67 @@ void    NW_Logger::clearBootReport() {
   _bootReport.status = 0;
 }
 
+uint8_t NW_Logger::scan(Print& out) {
+  //The sensor bus, address by address. A device that answers gets its Page 0
+  //read and checked; one that passes has named itself, which is what lets a
+  //logger be told what is attached rather than told what to expect.
+  bool initialStateExternalI2C = digitalRead(I2C_SW);
+  switchExternalI2C(ON);
+
+  NW_Pages p;                        //borrowed for page0Valid() and its CRC-8
+  uint8_t answered = 0, identified = 0;
+  out.println(F("I2C scan:"));
+  for (uint8_t adr = 0x08; adr <= 0x77; adr++) {
+    Wire.beginTransmission(adr);
+    if (Wire.endTransmission() != 0) continue;
+    answered++;
+    out.print(F("  0x"));
+    nwPrintHex(out, &adr, 1);
+    out.print(F("  "));
+
+    //Page 0 in one transaction: the firmware serves it from EEPROM, so it is
+    //valid before the device has taken a reading.
+    bool read = true;
+    Wire.beginTransmission(adr);
+    Wire.write((uint8_t)0x00);
+    if (Wire.endTransmission() != 0) read = false;
+    if (read && Wire.requestFrom(adr, (uint8_t)32) != 32) read = false;
+    if (read) for (uint8_t i = 0; i < 32; i++) p.page[i] = Wire.read();
+
+    if (!read || !p.page0Valid()) {
+      out.println(F("(no valid Page 0)"));
+      continue;
+    }
+    identified++;
+    for (uint8_t i = 1; i <= 7 && p.page[i]; i++) out.print((char)p.page[i]);
+    out.print(F("  HW "));
+    out.print(p.page[0x08]);
+    out.print('.');
+    out.print(p.page[0x09]);
+    out.print(F("  FW patch "));
+    out.print(p.page[0x0A]);
+    out.print(F("  SN "));
+    for (uint8_t i = 0; i < 4; i++) {
+      if (i) out.print('-');
+      nwPrintHex(out, p.page + 0x10 + 2 * i, 2);
+    }
+    //The address Page 0 was provisioned with, when it is not the one answering.
+    if (p.page[0x1F] != 0xFF && p.page[0x1F] != adr) {
+      out.print(F("  (Page 0 says 0x"));
+      nwPrintHex(out, &p.page[0x1F], 1);
+      out.print(')');
+    }
+    out.println();
+  }
+  out.print(answered);
+  out.print(F(" answered, "));
+  out.print(identified);
+  out.println(F(" Schema 1"));
+
+  farmGateI2C(initialStateExternalI2C);
+  return answered;
+}
+
 size_t NW_Logger::printFileHeader(Print& out) {
   //The logger's own columns first, then each watched sensor's in watch order,
   //which is also column order. Note is always the last column and carries no
