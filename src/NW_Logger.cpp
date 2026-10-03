@@ -283,8 +283,7 @@ void NW_Logger::SDtest() {
     _sd.chdir("/"); //The card's root
     _sd.mkdir(_sn); //Make directory with serial number as name: everything this logger writes lives in it
     _sd.chdir(_sn); //Move into this directory
-    String fileNameTest = "HWTest";
-    (fileNameTest + ".txt").toCharArray(_fileNameTestC, 11);
+    strlcpy(_fileNameTestC, "HWTest.txt", sizeof(_fileNameTestC));
     _sd.remove(_fileNameTestC); //Remove any previous files
 
     // Seed with a random process to ensure randomness
@@ -371,17 +370,13 @@ void NW_Logger::initLogFile() {
   _sd.chdir("/");  //The card's root
   _sd.chdir(_sn);  //Move into this logger's folder, named by its serial number
   //Find the first unused file number in "SD:/sn/"
-  char numCharArray[6];
-  String fileName = "log";
   int fileNum = 1;
-  sprintf(numCharArray, "%05d", fileNum);
-  (fileName + String(numCharArray) + ".csv").toCharArray(_fileNameC, 13);
+  snprintf(_fileNameC, sizeof(_fileNameC), "log%05d.csv", fileNum);
   while (_sd.exists(_fileNameC)) {
     fileNum += 1;
-    sprintf(numCharArray, "%05d", fileNum);
-    (fileName + String(numCharArray) + ".csv").toCharArray(_fileNameC, 13);
+    snprintf(_fileNameC, sizeof(_fileNameC), "log%05d.csv", fileNum);
   }
-  ("sta" + String(numCharArray) + ".csv").toCharArray(_fileNameStaC, 13); //The status file, same number
+  snprintf(_fileNameStaC, sizeof(_fileNameStaC), "sta%05d.csv", fileNum); //The status file, same number
   if (_fileNum != 0) _pages.latchNotice(0xF1); //NewLogFile: a later pair, not the first
   _fileNum = fileNum;
   Serial.print("FileNameC: ");
