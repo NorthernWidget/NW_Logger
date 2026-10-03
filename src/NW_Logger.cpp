@@ -523,6 +523,66 @@ void NW_Logger::run(String (*update)(void), unsigned long logInterval) {
   delay(1);
 }
 
+void NW_Logger::run(unsigned long logInterval) {
+  _logInterval = logInterval; //Served on Page 3
+  // Print note that that logging has started
+  // Serial.println("Log Started!"); //DEBUG!
+  // Serial.println(millis()); //DEBUG!
+  if (_newLog) {
+    // LogEvent = true;
+    _rtc.setAlarm(logInterval);
+    initLogFile(); //Start a new file each time log button is pressed
+    //Add inital data point
+    addDataPoint();
+    _newLog = false;  //Clear flag once log is started
+    blinkGood();  //Alert user to start of log
+    resetWDT(); //Clear alarm
+  }
+
+  if (_logEvent) {
+    // Serial.println("Log Event!"); //DEBUG!
+    // RTC.setAlarm(logInterval);  //Set/reset alarm //DEBUG!
+    addDataPoint(); //Write values to SD
+    afterLogEvent(); //A board's follow-up to the alarm-driven row (Okapi's backhaul)
+    _logEvent = false; //Clear log flag
+    _rtc.setAlarm(logInterval);  //Set/reset alarm
+    resetWDT(); //Clear alarm
+  }
+
+  // Write data to SD card without interrupting existing timing cycle
+  if (manualLog) {
+    // Serial.println("Click!"); //DEBUG!
+    addDataPoint(); //write values to SD
+    manualLog = false; //Clear log flag
+    resetWDT(); //Clear alarm
+  }
+
+  if (extIntTripped) {  // Defaults to just counter for now
+    // Serial.println("TIP!"); //DEBUG!
+    extIntCount ++;
+    extIntTripped = false; // Clear interrupt flag
+    resetWDT(); //Clear alarm
+    delay(150); //Hard-code for now; tipping bucket "debounce"
+    attachInterrupt(digitalPinToInterrupt(extIntPin), NW_Logger::isr2, FALLING);
+  }
+
+  if (!digitalRead(RTCInt)) {  //Catch alarm if not reset properly
+    Serial.println("Reset Alarm"); //DEBUG!
+    _rtc.setAlarm(logInterval); //Turn alarm back on
+  }
+
+  _awakeCount++;
+
+  // @bschulz1701: AwakeCount was designed to give ~5 run() iterations after
+  // an RTC wake before returning to sleep, reset to 0 by the RTC ISR
+  // (writeDataToSD). Since addDataPoint() blocks within a single run() call,
+  // the 5-count may be unnecessary. Consider simplifying or removing.
+  if (_awakeCount > 5) {
+    sleepNow();
+  }
+  delay(1);
+}
+
 // Send a pulse to "feed" the watchdog timer
 void NW_Logger::resetWDT() {
   if (WDHold == 255) return; // No watchdog timer on this board model
@@ -603,6 +663,67 @@ String NW_Logger::getOnBoardVals() {
   NW_StringPrint p(s);
   printDataRow(p);
   return s;
+}
+
+void NW_Logger::noteFrom(NW_Sensor& sensor, bool beginFailed) {
+  //One sensor's word into the Note column, semicolon-separated as note() does.
+  if (_note.length() > 0) _note += ";";
+  NW_StringPrint p(_note);
+  sensor.printNote(p, beginFailed);
+  Serial.print(F("Note: "));
+  Serial.println(_note);
+}
+
+void NW_Logger::readSensors() {
+  //The two acquisition calls on every watched sensor, in watch order. A Margay
+  //cuts the sensor rail at every sleep, so each one is begun again before it is
+  //asked for a reading, and whichever step refuses puts its word in the Note
+  //column: that is what the sketch's update() used to do by hand.
+  for (uint8_t i = 0; i < _numSensors; i++) {
+    if (_sensors[i] == this) continue;   //the logger reads its own channels below
+    NW_Sensor& s = *_sensors[i];
+    if (!s.wake()) {
+      noteFrom(s, true);
+      continue;
+    }
+    if (!s.acquire()) noteFrom(s, false);
+    else if (s.reportKind() != 0) noteFrom(s, false);
+  }
+  acquire();                          //this logger's own channels, last
+}
+
+int NW_Logger::logRow() {
+  //One row, written straight into the file and echoed to the monitor: this
+  //logger's own columns, then each watched sensor's in watch order, then Note.
+  //Nothing is composed in RAM (LIBRARY-DESIGN.md section 14).
+  Serial.print(_logTimeDate);
+  _sd.chdir("/");
+  _sd.chdir(_sn);
+  File DataFile = _sd.open(_fileNameC, FILE_WRITE);
+  if (!DataFile) {
+    Serial.println();
+    return -1;
+  }
+  printDataRow(DataFile);
+  for (uint8_t i = 0; i < _numSensors; i++) {
+    if (_sensors[i] == this) continue;
+    _sensors[i]->printDataRow(DataFile);
+  }
+  DataFile.print(_note);
+  DataFile.println();
+  _sdIndex = DataFile.position();     //Where the next row starts
+  DataFile.close();
+
+  //The monitor gets the same row. printDataRow() prints stored values, so a
+  //second pass costs formatting and no bus traffic.
+  printDataRow(Serial);
+  for (uint8_t i = 0; i < _numSensors; i++) {
+    if (_sensors[i] == this) continue;
+    _sensors[i]->printDataRow(Serial);
+  }
+  Serial.println(_note);
+  _note = "";                         //One row's worth of notes
+  return 0;
 }
 
 bool NW_Logger::watch(NW_Sensor& sensor) {

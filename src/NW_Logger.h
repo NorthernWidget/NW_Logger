@@ -207,6 +207,18 @@ class NW_Logger : public NW_Sensor
     void run(String (*f)(void), unsigned long logInterval);
 
     /**
+     * @brief The same loop, writing each row from the sensors it was given.
+     * @details The overload above calls back into a sketch for a composed
+     * String; this one walks the sensors watch() was given, in watch order,
+     * and each writes its own columns straight into the open file. The sketch
+     * therefore keeps no header and no update() function, and the header and
+     * the row can no longer disagree, because one definition produces both
+     * (LIBRARY-DESIGN.md section 14).
+     * @param logInterval seconds between readings, as the RTC alarm period.
+     */
+    void run(unsigned long logInterval);
+
+    /**
      * @brief Log one data point immediately, outside the normal run() cycle.
      * @details The board's library implements this: it switches the I2C bus
      * to external, calls the user's update() function, restores the bus,
@@ -214,6 +226,23 @@ class NW_Logger : public NW_Sensor
      * @param update Pointer to the user's update() function.
      */
     virtual void addDataPoint(String (*update)(void)) = 0;
+
+    /**
+     * @brief Read every watched sensor and write one row, with no String.
+     * @details Board-specific, as its String counterpart above is: a logger
+     * brings its own sensor bus up, calls readSensors() and then logRow()
+     * between the two, and fills its own pages afterwards.
+     */
+    virtual void addDataPoint() = 0;
+
+    /// @brief One sensor's word into the Note column, as note() would.
+    void noteFrom(NW_Sensor& sensor, bool beginFailed);
+
+    /// @brief wake() and acquire() each watched sensor, noting what failed.
+    void readSensors();
+
+    /// @brief Write one row: this logger's columns, each sensor's, then Note.
+    int logRow();
 
     /**
      * @brief Create a new sequentially numbered log file on the SD card.
