@@ -13,7 +13,7 @@ Andy Wickert
 volatile bool manualLog = false; // Global for interrupt access
 
 volatile uint8_t extIntPin = 255; // external interrupt pin; 255 = not set
-String ext_int_header_entry;
+const char* ext_int_header_entry = "nInterrupts,";
 volatile bool extIntTripped = false; // Global for the external interrupt
 volatile uint16_t extIntCount = 0; // Global for the external interrupt
 
@@ -31,16 +31,10 @@ ISR (PCINT0_vect) { // handle pin change interrupt for D24-D31 (Port A) on ATmeg
 
 // --- begin() in pieces: a board's begin() calls these in order around its own steps ---
 
-void NW_Logger::acceptAddresses(uint8_t *vals, uint8_t numVals, String header_) {
+void NW_Logger::acceptAddresses(uint8_t *vals, uint8_t numVals) {
   i2cTruncated = (numVals > sizeof(_i2cAdr));
   _numAdr = min(numVals, (uint8_t)sizeof(_i2cAdr));
   for (uint8_t i = 0; i < _numAdr; i++) _i2cAdr[i] = vals[i];
-  if (extIntPin == 255) {
-    _header = header_; //Copy user defined header
-  }
-  else {
-    _header = header_ + ext_int_header_entry;
-  }
 }
 
 bool NW_Logger::readIdentity() {
@@ -188,7 +182,7 @@ void NW_Logger::attachExtInt() {
   }
 }
 
-bool NW_Logger::begin(String header_) {
+bool NW_Logger::begin() {
   //No address list passed, so take one from the sensors watch() was given, in
   //watch order. A sketch used to keep a second list of its own, which had to
   //stay in step with the sensors it constructed and the header it composed
@@ -199,7 +193,7 @@ bool NW_Logger::begin(String header_) {
     if (_sensors[i] == this) continue;     //a logger is not found at an address
     if (_sensorAddress[i]) adr[n++] = _sensorAddress[i];
   }
-  return begin(adr, n, header_); //Call generalized begin function
+  return beginBoard(adr, n); //The board's own hardware start
 }
 
 void NW_Logger::I2Ctest() {
@@ -381,45 +375,32 @@ void NW_Logger::initLogFile() {
   // from every device on it (NW-Device-Specification Report register). Its
   // boot row carries what the data file's first line used to: library
   // version and serial number, with the hardware version beside them.
-  statusStr("Time,Trigger,Device,Serial,HW,FW,FWCommit,Lib,LibCommit,Code,Note,Page0,Page1,Page2"); //The logger's own boot row follows at the first reading (it watches itself)
+  //The status file's header row. The logger's own boot row follows at the first
+  //reading, because it watches itself.
+  _sd.chdir("/");
+  _sd.chdir(_sn);
+  File StatusHeader = _sd.open(_fileNameStaC, FILE_WRITE);
+  if (StatusHeader) {
+    StatusHeader.println(F("Time,Trigger,Device,Serial,HW,FW,FWCommit,Lib,LibCommit,Code,Note,Page0,Page1,Page2"));
+    StatusHeader.close();
+  }
+  Serial.println(F("Time,Trigger,Device,Serial,HW,FW,FWCommit,Lib,LibCommit,Code,Note,Page0,Page1,Page2"));
   // The data file starts with its header row, which the logger builds from
-  // its on-board columns and the sketch's _header (dataHeader()).
-  logStr(dataHeader());
+  // its own columns, then every watched sensor's (printFileHeader()).
+  //The data file's header row, written from the sensors watch() was given.
+  _sd.chdir("/");
+  _sd.chdir(_sn);
+  File HeaderFile = _sd.open(_fileNameC, FILE_WRITE);
+  if (HeaderFile) {
+    printFileHeader(HeaderFile);
+    HeaderFile.println();
+    HeaderFile.close();
+  }
+  printFileHeader(Serial);
+  Serial.println();
 }
 
-int NW_Logger::logStr(String val) {
-  Serial.println(val); //Echo to serial monitor
-  _sd.chdir("/");  //The card's root
-  _sd.chdir(_sn);  //Move into this logger's folder, named by its serial number
-  File DataFile = _sd.open(_fileNameC, FILE_WRITE);
 
-  // if the file is available, write to it:
-  if (DataFile) {
-    DataFile.println(val);
-    _sdIndex = DataFile.position(); //Where the next row starts, for a logger that reads rows back
-    DataFile.close();
-    return 0;
-  }
-  // if the file isn't open, pop up an error:
-  else {
-    return -1;
-  }
-}
-
-int NW_Logger::statusStr(String val) {
-  Serial.println(val); //Echo to serial monitor
-  _sd.chdir("/");  //The card's root
-  _sd.chdir(_sn);  //Move into this logger's folder, named by its serial number
-  File StatusFile = _sd.open(_fileNameStaC, FILE_WRITE);
-  if (StatusFile) {
-    StatusFile.println(val);
-    StatusFile.close();
-    return 0;
-  }
-  else {
-    return -1;
-  }
-}
 
 void NW_Logger::LED_Color(unsigned long val) { //Set color of onboard led
   int red = 0; //red led color
@@ -472,65 +453,6 @@ void NW_Logger::blinkGood() {
 }
 
 // Pass in function which returns string of data
-void NW_Logger::run(String (*update)(void), unsigned long logInterval) {
-  _logInterval = logInterval; //Served on Page 3
-  // Print note that that logging has started
-  // Serial.println("Log Started!"); //DEBUG!
-  // Serial.println(millis()); //DEBUG!
-  if (_newLog) {
-    // LogEvent = true;
-    _rtc.setAlarm(logInterval);
-    initLogFile(); //Start a new file each time log button is pressed
-    //Add inital data point
-    addDataPoint(update);
-    _newLog = false;  //Clear flag once log is started
-    blinkGood();  //Alert user to start of log
-    resetWDT(); //Clear alarm
-  }
-
-  if (_logEvent) {
-    // Serial.println("Log Event!"); //DEBUG!
-    // RTC.setAlarm(logInterval);  //Set/reset alarm //DEBUG!
-    addDataPoint(update); //Write values to SD
-    afterLogEvent(); //A board's follow-up to the alarm-driven row (Okapi's backhaul)
-    _logEvent = false; //Clear log flag
-    _rtc.setAlarm(logInterval);  //Set/reset alarm
-    resetWDT(); //Clear alarm
-  }
-
-  // Write data to SD card without interrupting existing timing cycle
-  if (manualLog) {
-    // Serial.println("Click!"); //DEBUG!
-    addDataPoint(update); //write values to SD
-    manualLog = false; //Clear log flag
-    resetWDT(); //Clear alarm
-  }
-
-  if (extIntTripped) {  // Defaults to just counter for now
-    // Serial.println("TIP!"); //DEBUG!
-    extIntCount ++;
-    extIntTripped = false; // Clear interrupt flag
-    resetWDT(); //Clear alarm
-    delay(150); //Hard-code for now; tipping bucket "debounce"
-    attachInterrupt(digitalPinToInterrupt(extIntPin), NW_Logger::isr2, FALLING);
-  }
-
-  if (!digitalRead(RTCInt)) {  //Catch alarm if not reset properly
-    Serial.println("Reset Alarm"); //DEBUG!
-    _rtc.setAlarm(logInterval); //Turn alarm back on
-  }
-
-  _awakeCount++;
-
-  // @bschulz1701: AwakeCount was designed to give ~5 run() iterations after
-  // an RTC wake before returning to sleep, reset to 0 by the RTC ISR
-  // (writeDataToSD). Since addDataPoint() blocks within a single run() call,
-  // the 5-count may be unnecessary. Consider simplifying or removing.
-  if (_awakeCount > 5) {
-    sleepNow();
-  }
-  delay(1);
-}
 
 void NW_Logger::run(unsigned long logInterval) {
   _logInterval = logInterval; //Served on Page 3
@@ -653,26 +575,7 @@ size_t NW_Logger::printFileHeader(Print& out) {
   return n;
 }
 
-String NW_Logger::dataHeader() {
-  //Note is always the last column and carries no comma after it: every
-  //sensor ends its fields with a comma for the next, so this ends the row.
-  String h;
-  NW_StringPrint p(h);
-  printDataHeader(p);
-  h += _header;
-  h += "Note";
-  return h;
-}
 
-String NW_Logger::getOnBoardVals() {
-  //The reading, then the row: printDataRow() prints what readOnBoard() left,
-  //which is what lets the same row reach two sinks without reading twice.
-  readOnBoard();
-  String s;
-  NW_StringPrint p(s);
-  printDataRow(p);
-  return s;
-}
 
 void NW_Logger::noteFrom(NW_Sensor& sensor, bool beginFailed) {
   //One sensor's word into the Note column, semicolon-separated as note() does.
@@ -705,14 +608,10 @@ int NW_Logger::logRow() {
   //One row, written straight into the file and echoed to the monitor: this
   //logger's own columns, then each watched sensor's in watch order, then Note.
   //Nothing is composed in RAM (LIBRARY-DESIGN.md section 14).
-  Serial.print(_logTimeDate);
   _sd.chdir("/");
   _sd.chdir(_sn);
   File DataFile = _sd.open(_fileNameC, FILE_WRITE);
-  if (!DataFile) {
-    Serial.println();
-    return -1;
-  }
+  if (!DataFile) return -1;
   printDataRow(DataFile);
   for (uint8_t i = 0; i < _numSensors; i++) {
     if (_sensors[i] == this) continue;
@@ -803,7 +702,7 @@ void NW_Logger::writeDataToSD() {
 }
 
 // ExtInt functions
-void NW_Logger::setExtInt(uint8_t n, String header_entry) {
+void NW_Logger::setExtInt(uint8_t n, const char* header_entry) {
   extIntPin = n;
   ext_int_header_entry = header_entry;
 }

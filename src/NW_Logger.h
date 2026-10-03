@@ -74,7 +74,7 @@ Andy Wickert
 // clears them, and a board's begin() reads the external-interrupt pin and header.
 extern volatile bool manualLog;
 extern volatile uint8_t extIntPin;
-extern String ext_int_header_entry;
+extern const char* ext_int_header_entry;
 extern volatile bool extIntTripped;
 extern volatile uint16_t extIntCount;
 
@@ -93,7 +93,7 @@ class NW_Logger : public NW_Sensor
      * @return true when the self-tests found nothing wrong (Okapi's convention;
      *         Margay sketches may ignore it as before).
      */
-    virtual bool begin(uint8_t *vals, uint8_t numVals, String header_) = 0;
+    virtual bool beginBoard(uint8_t *vals, uint8_t numVals) = 0;   ///< The board's own hardware start, called by begin()
 
     /**
      * @brief Initialise the logger with no external I2C sensors.
@@ -108,14 +108,13 @@ class NW_Logger : public NW_Sensor
      * from the sensors watch() was given, so a sketch no longer keeps a second
      * list that has to stay in step with them.
      */
-    bool begin(String header_ = "");
+    bool begin();
 
     /**
      * @brief Write a string to the SD card log file and echo it to Serial.
      * @param val String to log.
      * @return 0 on success, -1 if the log file could not be opened.
      */
-    int logStr(String val);
     /**
      * @brief Append one row to the status file (sta<n>.csv beside log<n>.csv).
      * @details Columns: Time,Trigger,Device,Serial,HW,FW,FWCommit,Lib,LibCommit,Code,Note,Page0,Page1,Page2.
@@ -124,7 +123,6 @@ class NW_Logger : public NW_Sensor
      * printStatus() line (NW_Core), whenever the device's reportKind() is not 0.
      * @return 0 written, -1 the file could not be opened
      */
-    int statusStr(String val);
     /**
      * @brief Register a sensor whose reports the status file should carry.
      * @details Call once per sensor in setup(). After every reading the logger
@@ -170,7 +168,6 @@ class NW_Logger : public NW_Sensor
      * header to begin(). printFileHeader() is the same row walked from the
      * watched sensors instead.
      */
-    String dataHeader();
 
     /**
      * @brief The logger's own columns for one row: read the board's channels,
@@ -178,7 +175,6 @@ class NW_Logger : public NW_Sensor
      * @details readOnBoard() is where a board differs; everything after it is
      * the same on every logger, which is why this lives here.
      */
-    String getOnBoardVals();
 
     // --- NW_Sensor: the logger is a Schema 1 device and watches itself ---
     /** @brief Kind of the logger's own report latched during the last reading (0 = none). */
@@ -223,18 +219,7 @@ class NW_Logger : public NW_Sensor
      *          comma-separated String of sensor readings with a trailing comma.
      * @param logInterval Logging interval in seconds.
      */
-    void run(String (*f)(void), unsigned long logInterval);
 
-    /**
-     * @brief The same loop, writing each row from the sensors it was given.
-     * @details The overload above calls back into a sketch for a composed
-     * String; this one walks the sensors watch() was given, in watch order,
-     * and each writes its own columns straight into the open file. The sketch
-     * therefore keeps no header and no update() function, and the header and
-     * the row can no longer disagree, because one definition produces both
-     * (LIBRARY-DESIGN.md section 14).
-     * @param logInterval seconds between readings, as the RTC alarm period.
-     */
     void run(unsigned long logInterval);
 
     /**
@@ -244,7 +229,6 @@ class NW_Logger : public NW_Sensor
      * prepends its on-board values and writes the row.
      * @param update Pointer to the user's update() function.
      */
-    virtual void addDataPoint(String (*update)(void)) = 0;
 
     /**
      * @brief Read every watched sensor and write one row, with no String.
@@ -284,7 +268,7 @@ class NW_Logger : public NW_Sensor
      * @param header_entry CSV column label for the counter, including trailing
      *                     comma (default "nInterrupts,").
      */
-    void setExtInt(uint8_t n, String header_entry = "nInterrupts,");
+    void setExtInt(uint8_t n, const char* header_entry = "nInterrupts,");
 
     /**
      * @brief Atomically read the external interrupt event count.
@@ -340,7 +324,7 @@ class NW_Logger : public NW_Sensor
     virtual void afterLogEvent() {}  ///< Called by run() after an alarm-driven row is written (Okapi: the backhaul).
 
     // --- begin() in pieces: a board's begin() calls these in order around its own steps ---
-    void acceptAddresses(uint8_t *vals, uint8_t numVals, String header_); ///< The sketch's sensor addresses (truncated to 128) and header, plus the ext-int column
+    void acceptAddresses(uint8_t *vals, uint8_t numVals); ///< The watched sensors' addresses, truncated to 128
     bool readIdentity();     ///< Pages 0-1 from EEPROM; _sn and _hwVersion from Page 0 (Schema 1) or the last 8 bytes (Schema 0). Returns whether Page 0 is valid; latches Page0Invalid if not
     void serialTimeSet();    ///< A YYMMDDHHMMSS string waiting on Serial sets the clock (notice ClockSet); prints the timestamp
     void attachLoggerInterrupts(bool buttonOnPCINT); ///< LED pins, SD chip select, file times, the alarm ISR and the log button (INT0 or PCINT)
@@ -374,7 +358,6 @@ class NW_Logger : public NW_Sensor
     bool _sdCardMissing = false;
     bool _batError = false;
     bool _batWarning = false;
-    String _header = "";
     String _note = ""; // pending word(s) for the Note column of the next row
     const char HEX_MAP[16] = {
       '0', '1', '2', '3', '4', '5', '6', '7',
