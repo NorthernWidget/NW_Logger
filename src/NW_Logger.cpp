@@ -189,8 +189,17 @@ void NW_Logger::attachExtInt() {
 }
 
 bool NW_Logger::begin(String header_) {
-  uint8_t dummy[1] = {0};
-  return begin(dummy, 0, header_); //Call generalized begin function
+  //No address list passed, so take one from the sensors watch() was given, in
+  //watch order. A sketch used to keep a second list of its own, which had to
+  //stay in step with the sensors it constructed and the header it composed
+  //(Andy, 2026-10-03). Watch nothing and this tests nothing, as before.
+  uint8_t adr[MAX_SENSORS];
+  uint8_t n = 0;
+  for (uint8_t i = 0; i < _numSensors; i++) {
+    if (_sensors[i] == this) continue;     //a logger is not found at an address
+    if (_sensorAddress[i]) adr[n++] = _sensorAddress[i];
+  }
+  return begin(adr, n, header_); //Call generalized begin function
 }
 
 void NW_Logger::I2Ctest() {
@@ -682,7 +691,7 @@ void NW_Logger::readSensors() {
   for (uint8_t i = 0; i < _numSensors; i++) {
     if (_sensors[i] == this) continue;   //the logger reads its own channels below
     NW_Sensor& s = *_sensors[i];
-    if (!s.wake()) {
+    if (!s.wake(_sensorAddress[i])) {
       noteFrom(s, true);
       continue;
     }
@@ -726,11 +735,13 @@ int NW_Logger::logRow() {
   return 0;
 }
 
-bool NW_Logger::watch(NW_Sensor& sensor) {
+bool NW_Logger::watch(NW_Sensor& sensor, uint8_t address) {
   if (_numSensors >= MAX_SENSORS) return false;
+  _sensorAddress[_numSensors] = address ? address : sensor.defaultAddress();
   _sensors[_numSensors++] = &sensor;
   return true;
 }
+
 
 int NW_Logger::statusRow(const char* trigger, NW_Sensor& sensor, bool boot) {
   _sd.chdir("/");  //The card's root

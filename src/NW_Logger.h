@@ -102,6 +102,12 @@ class NW_Logger : public NW_Sensor
      * @param header_ Optional column header string (default empty).
      * @return what begin(vals, numVals, header_) returns.
      */
+    /**
+     * @brief Start the logger, testing the bus for the sensors it holds.
+     * @details Call watch() first. With no address list passed, this takes one
+     * from the sensors watch() was given, so a sketch no longer keeps a second
+     * list that has to stay in step with them.
+     */
     bool begin(String header_ = "");
 
     /**
@@ -130,7 +136,20 @@ class NW_Logger : public NW_Sensor
      * identity and versions. Up to MAX_SENSORS of them.
      * @return false if the list is full
      */
-    bool watch(NW_Sensor& sensor);
+    /**
+     * @brief Hold a sensor: its reports go to the status file, its columns to
+     * the data file, and its address to the bus test.
+     * @details Watch order is column order. Say the address once, here, where
+     * the relationship is declared; a sketch no longer keeps a second list of
+     * addresses that has to stay in step with the sensors it constructed
+     * (Andy, 2026-10-03).
+     * @param sensor the sensor, which must outlive the logger's use of it.
+     * @param address where to find it, or 0 for its own default address.
+     * @return False when MAX_SENSORS are already held.
+     */
+    bool watch(NW_Sensor& sensor, uint8_t address = 0);
+
+
 
     /**
      * @brief Print the data file's whole header row: this logger's own columns,
@@ -382,6 +401,7 @@ class NW_Logger : public NW_Sensor
     unsigned long _logInterval = 0; // seconds, from run(); served on Page 3
     uint16_t _fileNum = 0;   // the number of the current log and status file pair
     NW_Sensor* _sensors[MAX_SENSORS]; // sensors whose reports go to the status file (watch())
+    uint8_t _sensorAddress[MAX_SENSORS] = {0}; // where each one is, from watch()
     uint8_t _numSensors = 0;
     bool _deviceBootRows = false; // the first reading's boot rows have been written
     int statusRow(const char* trigger, NW_Sensor& sensor, bool boot); // one device row: time, trigger, printStatus()
