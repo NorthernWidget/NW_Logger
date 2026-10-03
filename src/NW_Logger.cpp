@@ -193,7 +193,22 @@ bool NW_Logger::begin() {
     if (_sensors[i] == this) continue;     //a logger is not found at an address
     if (_sensorAddress[i]) adr[n++] = _sensorAddress[i];
   }
-  return beginBoard(adr, n); //The board's own hardware start
+  bool ok = beginBoard(adr, n); //The board's own hardware start
+  _begun = true;                //The sensor rail and the bus switch are up
+  return ok;
+}
+
+bool NW_Logger::begin(NW_Sensor** candidates, uint8_t n) {
+  //The board first, then the bus. Discovery needs the sensor rail and the bus
+  //switch, and bringing those up is what begin() does, so the order is the
+  //logger's to keep rather than the sketch's to remember: a bus asked before
+  //begin() answers nothing at all. Nothing in begin() depends on knowing the
+  //sensors beforehand except I2Ctest(), and discovery is the stronger test -
+  //every device it watched answered to its name. The data file's header row is
+  //written by initLogFile() at the first run(), which is after this.
+  bool ok = begin();
+  discover(candidates, n);
+  return ok;
 }
 
 void NW_Logger::I2Ctest() {
@@ -651,6 +666,14 @@ uint8_t NW_Logger::scan(Print& out) {
 }
 
 uint8_t NW_Logger::discover(NW_Sensor** candidates, uint8_t n) {
+  if (!_begun) {
+    //The sensor rail is off and the bus switch is an input until begin() has
+    //run, so the bus would answer nothing and this would watch nothing. Report
+    //it as the sensor fault it is, which the LED and the boot row both carry,
+    //rather than logging a file of on-board columns and saying nothing.
+    _sensorError = true;
+    return 0;
+  }
   //The same walk scan() makes, answered with watch() instead of a line of text.
   //A device that passes its Page 0 checks has named itself; a candidate whose
   //name() is that name is the library that reads it, and it is watched at the

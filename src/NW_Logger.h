@@ -111,6 +111,19 @@ class NW_Logger : public NW_Sensor
     bool begin();
 
     /**
+     * @brief Start the logger and then ask the bus what is attached.
+     * @details The board first, then the bus: discovery needs the sensor rail
+     * and the bus switch, and begin() is what brings those up, so the order is
+     * the logger's to keep rather than the sketch's to remember. One line in
+     * setup() therefore starts a logger that holds whatever is plugged into it
+     * (LIBRARY-DESIGN.md section 16).
+     * @param candidates the libraries that may be on the bus; see discover().
+     * @param n how many candidates there are.
+     * @return what begin() returns: true when the self-tests found nothing wrong.
+     */
+    bool begin(NW_Sensor** candidates, uint8_t n);
+
+    /**
      * @brief Write a string to the SD card log file and echo it to Serial.
      * @param val String to log.
      * @return 0 on success, -1 if the log file could not be opened.
@@ -186,7 +199,12 @@ class NW_Logger : public NW_Sensor
      * answered on, which may not be its default, and address order is therefore
      * column order (LIBRARY-DESIGN.md section 16).
      *
-     * Call this instead of watch() in setup(), or beside it. One object holds
+     * Call begin(candidates, n) rather than this, unless the logger is already
+     * begun: the sensor rail is off until begin() has run, and a bus asked
+     * before that answers nothing. Called too early, this watches nothing and
+     * reports a sensor fault rather than logging a file of on-board columns.
+     *
+     * Use it beside watch(), or instead of it. One object holds
      * one address at a time, so two boards of the same kind need two slots in
      * the table. The bus is walked while slots remain: a logger holds
      * MAX_SENSORS sensors, and the return value says how many it took.
@@ -398,6 +416,7 @@ class NW_Logger : public NW_Sensor
     bool i2cTruncated = false; // true if numVals passed to begin() exceeded I2C_ADR capacity
     bool _onBoardError = false;
     bool _sensorError = false;
+    bool _begun = false;        // begin() has run, so the sensor rail and bus switch are up
     bool _timeError = false;
     bool _sdCardMissing = false;
     bool _batError = false;
