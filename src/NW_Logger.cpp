@@ -97,7 +97,7 @@ void NW_Logger::serialTimeSet() {
     else {
       //The clock keeps the time it had. Saying so matters: the old code read a
       //malformed stamp as zeroes and set the clock to the year 2000 in silence.
-      Serial.println("Not a YYMMDDHHMMSS timestamp: the clock is unchanged");
+      Serial.println(F("Not a YYMMDDHHMMSS timestamp: the clock is unchanged"));
     }
   }
 
