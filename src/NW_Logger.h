@@ -18,8 +18,8 @@ Andy Wickert
 #include <avr/wdt.h>
 #include <avr/power.h>
 #include <EEPROM.h>
-#include <NW_Core.h>   // NW_Sensor: the view the status file takes of a sensor; NW_Pages: the logger's own pages
-#include "NW_TimeStamp.h"   // the twelve-digit stamp the clock is set from
+#include <NW_Core.h>       // NW_Sensor: the view the status file takes of a sensor; NW_Pages: the logger's own pages
+#include "NW_TimeStamp.h"  // the twelve-digit stamp the clock is set from
 #include "DS3231_Logger.h"
 #include "SdFat.h"
 #include <NW_BME280.h>
@@ -36,18 +36,18 @@ Andy Wickert
 /// Packed 32-bit LED color values. Format: 0xLLRRGGBB where LL = luminosity,
 /// RR = red, GG = green, BB = blue. Pass to LED_Color().
 /// @{
-#define RED         0xFFFF0000L
-#define GREEN       0xFF00FF00L
-#define BLUE        0xFF0000FFL
-#define MAROON      0xFF800000L
-#define GOLD        0xFFFFD700L
-#define ORANGE      0xFFFFA500L
-#define PURPLE      0xFF800080L
-#define CYAN        0xFF00FFFFL
-#define BLACK_ALERT 0x802019FFL ///< Deep blue-violet; used internally for error states.
+#define RED 0xFFFF0000L
+#define GREEN 0xFF00FF00L
+#define BLUE 0xFF0000FFL
+#define MAROON 0xFF800000L
+#define GOLD 0xFFFFD700L
+#define ORANGE 0xFFFFA500L
+#define PURPLE 0xFF800080L
+#define CYAN 0xFF00FFFFL
+#define BLACK_ALERT 0x802019FFL  ///< Deep blue-violet; used internally for error states.
 /// @}
 
-#define ON  1
+#define ON 1
 #define OFF 0
 
 //Define CBI macro
@@ -79,10 +79,9 @@ extern const char* ext_int_header_entry;
 extern volatile bool extIntTripped;
 extern volatile uint16_t extIntCount;
 
-class NW_Logger : public NW_Sensor
-{
-  public:
-    /**
+class NW_Logger : public NW_Sensor {
+public:
+  /**
      * @brief Initialise the logger with a list of external I2C sensor addresses.
      * @details The board's library implements this: power, pins, on-board
      * chips, the serial number, self-tests, the LED report and the interrupts.
@@ -94,24 +93,24 @@ class NW_Logger : public NW_Sensor
      * @return true when the self-tests found nothing wrong (Okapi's convention;
      *         Margay sketches may ignore it as before).
      */
-    virtual bool beginBoard(uint8_t *vals, uint8_t numVals) = 0;   ///< The board's own hardware start, called by begin()
+  virtual bool beginBoard(uint8_t* vals, uint8_t numVals) = 0;  ///< The board's own hardware start, called by begin()
 
-    /**
+  /**
      * @brief Initialise the logger with no external I2C sensors.
      * @details Convenience overload; equivalent to calling
      * begin(empty_array, 0, header_). Logs only on-board sensor values.
      * @param header_ Optional column header string (default empty).
      * @return what begin(vals, numVals, header_) returns.
      */
-    /**
+  /**
      * @brief Start the logger, testing the bus for the sensors it holds.
      * @details Call watch() first. With no address list passed, this takes one
      * from the sensors watch() was given, so a sketch no longer keeps a second
      * list that has to stay in step with them.
      */
-    bool begin();
+  bool begin();
 
-    /**
+  /**
      * @brief Start the logger and then ask the bus what is attached.
      * @details The board first, then the bus: discovery needs the sensor rail
      * and the bus switch, and begin() is what brings those up, so the order is
@@ -122,14 +121,14 @@ class NW_Logger : public NW_Sensor
      * @param n how many candidates there are.
      * @return what begin() returns: true when the self-tests found nothing wrong.
      */
-    bool begin(NW_Sensor** candidates, uint8_t n);
+  bool begin(NW_Sensor** candidates, uint8_t n);
 
-    /**
+  /**
      * @brief Write a string to the SD card log file and echo it to Serial.
      * @param val String to log.
      * @return 0 on success, -1 if the log file could not be opened.
      */
-    /**
+  /**
      * @brief Append one row to the status file (sta<n>.csv beside log<n>.csv).
      * @details Columns: Time,Trigger,Device,Serial,HW,FW,FWCommit,Lib,LibCommit,Code,Note,Page0,Page1,Page2.
      * The logger writes its own boot row at every new file; a sketch writes a
@@ -137,7 +136,7 @@ class NW_Logger : public NW_Sensor
      * printStatus() line (NW_Core), whenever the device's reportKind() is not 0.
      * @return 0 written, -1 the file could not be opened
      */
-    /**
+  /**
      * @brief Register a sensor whose reports the status file should carry.
      * @details Call once per sensor in setup(). After every reading the logger
      * writes a row for each watched sensor whose report says something happened:
@@ -148,7 +147,7 @@ class NW_Logger : public NW_Sensor
      * identity and versions. Up to MAX_SENSORS of them.
      * @return false if the list is full
      */
-    /**
+  /**
      * @brief Hold a sensor: its reports go to the status file, its columns to
      * the data file, and its address to the bus test.
      * @details Watch order is column order. Say the address once, here, where
@@ -159,11 +158,11 @@ class NW_Logger : public NW_Sensor
      * @param address where to find it, or 0 for its own default address.
      * @return False when MAX_SENSORS are already held.
      */
-    bool watch(NW_Sensor& sensor, uint8_t address = 0);
+  bool watch(NW_Sensor& sensor, uint8_t address = 0);
 
 
 
-    /**
+  /**
      * @brief Print the data file's whole header row: this logger's own columns,
      * then each watched sensor's in watch order, then the external-interrupt
      * column, then Note.
@@ -173,7 +172,7 @@ class NW_Logger : public NW_Sensor
      * @param out Where to print.
      * @return Bytes printed.
      */
-    /**
+  /**
      * @brief Report every device on the sensor bus, and name the Schema 1 ones.
      * @details Probes each 7-bit address, and for every device that answers
      * reads Page 0 and checks it: schema byte, magic byte and CRC-8. A device
@@ -187,9 +186,9 @@ class NW_Logger : public NW_Sensor
      * @param out where to print.
      * @return How many devices answered, Schema 1 or not.
      */
-    uint8_t scan(Print& out);
+  uint8_t scan(Print& out);
 
-    /**
+  /**
      * @brief Watch whatever the bus holds: ask it what is attached, and hold
      * each device with the library that answers to its name.
      * @details The walk scan() makes, answered with watch() instead of a line
@@ -214,11 +213,11 @@ class NW_Logger : public NW_Sensor
      * @param n how many candidates there are.
      * @return How many devices were found and watched.
      */
-    uint8_t discover(NW_Sensor** candidates, uint8_t n);
+  uint8_t discover(NW_Sensor** candidates, uint8_t n);
 
-    size_t printFileHeader(Print& out);
+  size_t printFileHeader(Print& out);
 
-    /**
+  /**
      * @brief The data file's header row as a String: the on-board columns,
      * _header, and the Note column.
      * @details The sketch-composed path, kept while a sketch still passes a
@@ -226,22 +225,22 @@ class NW_Logger : public NW_Sensor
      * watched sensors instead.
      */
 
-    /**
+  /**
      * @brief The logger's own columns for one row: read the board's channels,
      * then print them.
      * @details readOnBoard() is where a board differs; everything after it is
      * the same on every logger, which is why this lives here.
      */
 
-    // --- NW_Sensor: the logger is a Schema 1 device and watches itself ---
-    /** @brief Kind of the logger's own report latched during the last reading (0 = none). */
-    uint8_t reportKind() override;
-    bool reportIsFault() override;
-    /** @brief The report at boot: LoggingStarted (0xF0), or the first fault begin() found. */
-    uint8_t bootReportKind() override;
-    void clearBootReport() override;
+  // --- NW_Sensor: the logger is a Schema 1 device and watches itself ---
+  /** @brief Kind of the logger's own report latched during the last reading (0 = none). */
+  uint8_t reportKind() override;
+  bool reportIsFault() override;
+  /** @brief The report at boot: LoggingStarted (0xF0), or the first fault begin() found. */
+  uint8_t bootReportKind() override;
+  void clearBootReport() override;
 
-    /**
+  /**
      * @brief Note a one-word condition for the current log row.
      * @details The word goes in the Note column, the last column of every
      * row, written without a comma after it so the row ends cleanly. It is
@@ -250,18 +249,18 @@ class NW_Logger : public NW_Sensor
      * Typical words: NotAnswering, OldFirmware, NotSchema1, LiDARTimeout.
      * @param word One word (no commas) naming the condition.
      */
-    void note(const char* word);
+  void note(const char* word);
 
-    /**
+  /**
      * @brief Set the on-board RGB LED to a packed color value.
      * @details The color format is 0xLLRRGGBB: byte 3 = luminosity,
      * byte 2 = red, byte 1 = green, byte 0 = blue. Use the predefined
      * color constants (RED, GREEN, BLUE, etc.) or OFF to turn the LED off.
      * @param val Packed 32-bit color value.
      */
-    void LED_Color(unsigned long val);
+  void LED_Color(unsigned long val);
 
-    /**
+  /**
      * @brief Main logging loop; call from Arduino loop().
      * @details Handles three logging triggers:
      *   - RTC alarm (every logInterval seconds): logs a data point and
@@ -277,9 +276,9 @@ class NW_Logger : public NW_Sensor
      * @param logInterval Logging interval in seconds.
      */
 
-    void run(unsigned long logInterval);
+  void run(unsigned long logInterval);
 
-    /**
+  /**
      * @brief Log one data point immediately, outside the normal run() cycle.
      * @details The board's library implements this: it switches the I2C bus
      * to external, calls the user's update() function, restores the bus,
@@ -287,24 +286,24 @@ class NW_Logger : public NW_Sensor
      * @param update Pointer to the user's update() function.
      */
 
-    /**
+  /**
      * @brief Read every watched sensor and write one row, with no String.
      * @details Board-specific, as its String counterpart above is: a logger
      * brings its own sensor bus up, calls readSensors() and then logRow()
      * between the two, and fills its own pages afterwards.
      */
-    virtual void addDataPoint() = 0;
+  virtual void addDataPoint() = 0;
 
-    /// @brief One sensor's word into the Note column, as note() would.
-    void noteFrom(NW_Sensor& sensor, bool beginFailed);
+  /// @brief One sensor's word into the Note column, as note() would.
+  void noteFrom(NW_Sensor& sensor, bool beginFailed);
 
-    /// @brief wake() and acquire() each watched sensor, noting what failed.
-    void readSensors();
+  /// @brief wake() and acquire() each watched sensor, noting what failed.
+  void readSensors();
 
-    /// @brief Write one row: this logger's columns, each sensor's, then Note.
-    int logRow();
+  /// @brief Write one row: this logger's columns, each sensor's, then Note.
+  int logRow();
 
-    /**
+  /**
      * @brief Create a new sequentially numbered log file on the SD card.
      * @details The pair logNNNNN.csv and staNNNNN.csv lives in SD:/<SN>/.
      * Searches for the next unused number, writes the status file's header
@@ -312,9 +311,9 @@ class NW_Logger : public NW_Sensor
      * Called automatically by run() when a new log is started; can also be
      * called directly (e.g. from HighSpeed_NoSleep sketches).
      */
-    void initLogFile();
+  void initLogFile();
 
-    /**
+  /**
      * @brief Configure a pin as an external interrupt event counter.
      * @details Attaches a falling-edge interrupt to the given pin. Each
      * falling edge increments an internal counter accessible via
@@ -325,9 +324,9 @@ class NW_Logger : public NW_Sensor
      * @param header_entry CSV column label for the counter, including trailing
      *                     comma (default "nInterrupts,").
      */
-    void setExtInt(uint8_t n, const char* header_entry = "nInterrupts,");
+  void setExtInt(uint8_t n, const char* header_entry = "nInterrupts,");
 
-    /**
+  /**
      * @brief Atomically read the external interrupt event count.
      * @details Disables interrupts while reading and optionally resetting the
      * 16-bit counter to prevent torn reads on the 8-bit AVR. Any interrupt
@@ -335,130 +334,130 @@ class NW_Logger : public NW_Sensor
      * @param reset0 If true (default), reset the counter to zero after reading.
      * @return Number of external interrupt events since the last reset.
      */
-    uint16_t getExtIntCount(bool reset0 = true);
+  uint16_t getExtIntCount(bool reset0 = true);
 
-    /**
+  /**
      * @brief Atomically set the external interrupt counter to a given value.
      * @details Disables interrupts during the write to prevent a torn store
      * on the 8-bit AVR. Any interrupt that arrives during the critical section
      * is deferred, not lost.
      * @param start Value to set the counter to (default 0).
      */
-    void resetExtIntCount(uint16_t start = 0);
+  void resetExtIntCount(uint16_t start = 0);
 
-    /**
+  /**
      * @brief Pulse the external watchdog timer's DONE pin.
      * @details Pulses WDHold HIGH for 5 µs to feed the hardware watchdog.
      * Call periodically to prevent a hardware watchdog reset.
      * Does nothing when WDHold is 255 (no watchdog on this board model).
      */
-    void resetWDT();
+  void resetWDT();
 
-    // -----------------------------------------------------------------------
-    // Public pin definitions shared by every logger
-    // A board's constructor sets these to its own values; do not modify
-    // after begin() is called.
-    // -----------------------------------------------------------------------
-    uint8_t SD_CS  = 4;  ///< SD card SPI chip-select pin.
-    uint8_t AuxLED = 20; ///< Auxiliary single-color LED pin.
-    uint8_t RedLED = 13; ///< Red channel of on-board RGB LED (active low).
-    uint8_t GreenLED = 15; ///< Green channel of on-board RGB LED (active low).
-    uint8_t BlueLED  = 14; ///< Blue channel of on-board RGB LED (active low).
-    uint8_t SD_CD       = 1; ///< SD card detect pin (LOW when card is present).
-    uint8_t I2C_SW     = 21; ///< I2C bus switch (HIGH = external bus, LOW = internal bus).
-    uint8_t RTCInt     = 10; ///< RTC alarm interrupt pin.
-    uint8_t LogInt     =  2; ///< Manual log button interrupt pin.
-    uint8_t WDHold     = 23; ///< Watchdog timer DONE pin (255 = not present on this model).
+  // -----------------------------------------------------------------------
+  // Public pin definitions shared by every logger
+  // A board's constructor sets these to its own values; do not modify
+  // after begin() is called.
+  // -----------------------------------------------------------------------
+  uint8_t SD_CS = 4;      ///< SD card SPI chip-select pin.
+  uint8_t AuxLED = 20;    ///< Auxiliary single-color LED pin.
+  uint8_t RedLED = 13;    ///< Red channel of on-board RGB LED (active low).
+  uint8_t GreenLED = 15;  ///< Green channel of on-board RGB LED (active low).
+  uint8_t BlueLED = 14;   ///< Blue channel of on-board RGB LED (active low).
+  uint8_t SD_CD = 1;      ///< SD card detect pin (LOW when card is present).
+  uint8_t I2C_SW = 21;    ///< I2C bus switch (HIGH = external bus, LOW = internal bus).
+  uint8_t RTCInt = 10;    ///< RTC alarm interrupt pin.
+  uint8_t LogInt = 2;     ///< Manual log button interrupt pin.
+  uint8_t WDHold = 23;    ///< Watchdog timer DONE pin (255 = not present on this model).
 
-  protected:
-    // --- the hooks a board's library fills in ---
+protected:
+  // --- the hooks a board's library fills in ---
 
 
 
-    /** @brief Read this board's own channels into its members. Board-specific. */
-    virtual void readOnBoard() = 0;
-    virtual void sleepNow() = 0;     ///< Power down between events and come back with the card ready.
-    virtual void afterLogEvent() {}  ///< Called by run() after an alarm-driven row is written (Okapi: the backhaul).
+  /** @brief Read this board's own channels into its members. Board-specific. */
+  virtual void readOnBoard() = 0;
+  virtual void sleepNow() = 0;     ///< Power down between events and come back with the card ready.
+  virtual void afterLogEvent() {}  ///< Called by run() after an alarm-driven row is written (Okapi: the backhaul).
 
-    // --- begin() in pieces: a board's begin() calls these in order around its own steps ---
-    void acceptAddresses(uint8_t *vals, uint8_t numVals); ///< The watched sensors' addresses, truncated to 128
-    bool readIdentity();     ///< Pages 0-1 from EEPROM; _sn and _hwVersion from Page 0 (Schema 1) or the last 8 bytes (Schema 0). Returns whether Page 0 is valid; latches Page0Invalid if not
-    void serialTimeSet();    ///< A YYMMDDHHMMSS string waiting on Serial sets the clock (notice ClockSet); prints the timestamp
-    void attachLoggerInterrupts(bool buttonOnPCINT); ///< LED pins, SD chip select, file times, the alarm ISR and the log button (INT0 or PCINT)
-    void ledReport();        ///< The self-test flags on the RGB LED, then "Ready to Log"
-    void attachExtInt();     ///< The external-interrupt counter, if setExtInt() named a pin
+  // --- begin() in pieces: a board's begin() calls these in order around its own steps ---
+  void acceptAddresses(uint8_t* vals, uint8_t numVals);  ///< The watched sensors' addresses, truncated to 128
+  bool readIdentity();                                   ///< Pages 0-1 from EEPROM; _sn and _hwVersion from Page 0 (Schema 1) or the last 8 bytes (Schema 0). Returns whether Page 0 is valid; latches Page0Invalid if not
+  void serialTimeSet();                                  ///< A YYMMDDHHMMSS string waiting on Serial sets the clock (notice ClockSet); prints the timestamp
+  void attachLoggerInterrupts(bool buttonOnPCINT);       ///< LED pins, SD chip select, file times, the alarm ISR and the log button (INT0 or PCINT)
+  void ledReport();                                      ///< The self-test flags on the RGB LED, then "Ready to Log"
+  void attachExtInt();                                   ///< The external-interrupt counter, if setExtInt() named a pin
 
-    void blinkGood();
-    virtual void writeDataToSD();
-    virtual void buttonLog();
-    static void isr0();
-    static void isr1();
-    static void isr2();
-    static NW_Logger* selfPointer;
-    static void dateTimeSD(uint16_t* date, uint16_t* time);
-    void switchExternalI2C(bool desiredState);
-    bool answers(uint8_t address);                     ///< Does anything hold that address?
-    bool readPage0(uint8_t address, NW_Pages& pages);  ///< Read Page 0 from it; true when the page passes its checks
-    bool watching(NW_Sensor& sensor);                  ///< Is that sensor already held?
-    void getTime();
-    void I2Ctest();
-    void SDtest();
-    void clockTest();
-    void extIntCounter();
-    void farmGateI2C(bool initialStateExternalI2C);
+  void blinkGood();
+  virtual void writeDataToSD();
+  virtual void buttonLog();
+  static void isr0();
+  static void isr1();
+  static void isr2();
+  static NW_Logger* selfPointer;
+  static void dateTimeSD(uint16_t* date, uint16_t* time);
+  void switchExternalI2C(bool desiredState);
+  bool answers(uint8_t address);                     ///< Does anything hold that address?
+  bool readPage0(uint8_t address, NW_Pages& pages);  ///< Read Page 0 from it; true when the page passes its checks
+  bool watching(NW_Sensor& sensor);                  ///< Is that sensor already held?
+  void getTime();
+  void I2Ctest();
+  void SDtest();
+  void clockTest();
+  void extIntCounter();
+  void farmGateI2C(bool initialStateExternalI2C);
 
-    DS3231_Logger _rtc;
-    BME bme280;
+  DS3231_Logger _rtc;
+  BME bme280;
 
-    static const uint16_t NOTE_CAPACITY = 256;  ///< MAX_SENSORS words of a chip name plus a kind, with separators (256 does not fit a uint8_t)
-    char _note[NOTE_CAPACITY] = {0};  // pending word(s) for the Note column of the next row
-    char _logTimeDate[20] = "2063/04/05 20:00:00";   // always nineteen characters
-    char _hwVersion[8] = {0};         // "255.255" at widest, from Page 0's two version bytes
-    bool i2cTruncated = false; // true if numVals passed to begin() exceeded I2C_ADR capacity
-    bool _onBoardError = false;
-    bool _sensorError = false;
-    bool _begun = false;        // begin() has run, so the sensor rail and bus switch are up
-    bool _timeError = false;
-    bool _sdCardMissing = false;
-    bool _batError = false;
-    bool _batWarning = false;
-    const char HEX_MAP[16] = {
-      '0', '1', '2', '3', '4', '5', '6', '7',
-      '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
-    }; // hex digit lookup table
-    char _sn[20] = {0}; // serial number: 19 chars + null terminator
-    uint8_t _numAdr = 0;
-    uint8_t _i2cAdr[128] = {0}; // one slot per usable 7-bit I2C address
-    uint8_t _numAdrOb = 1;
-    uint8_t _i2cAdrOb[6] = {0x68}; // on-board chips, the clock first; a board fills the rest (Margay two, Okapi six)
+  static const uint16_t NOTE_CAPACITY = 256;      ///< MAX_SENSORS words of a chip name plus a kind, with separators (256 does not fit a uint8_t)
+  char _note[NOTE_CAPACITY] = { 0 };              // pending word(s) for the Note column of the next row
+  char _logTimeDate[20] = "2063/04/05 20:00:00";  // always nineteen characters
+  char _hwVersion[8] = { 0 };                     // "255.255" at widest, from Page 0's two version bytes
+  bool i2cTruncated = false;                      // true if numVals passed to begin() exceeded I2C_ADR capacity
+  bool _onBoardError = false;
+  bool _sensorError = false;
+  bool _begun = false;  // begin() has run, so the sensor rail and bus switch are up
+  bool _timeError = false;
+  bool _sdCardMissing = false;
+  bool _batError = false;
+  bool _batWarning = false;
+  const char HEX_MAP[16] = {
+    '0', '1', '2', '3', '4', '5', '6', '7',
+    '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
+  };                     // hex digit lookup table
+  char _sn[20] = { 0 };  // serial number: 19 chars + null terminator
+  uint8_t _numAdr = 0;
+  uint8_t _i2cAdr[128] = { 0 };  // one slot per usable 7-bit I2C address
+  uint8_t _numAdrOb = 1;
+  uint8_t _i2cAdrOb[6] = { 0x68 };  // on-board chips, the clock first; a board fills the rest (Margay two, Okapi six)
 
-    volatile bool _logEvent = false; //Used to test if logging should begin yet
-    volatile bool _newLog = false; //Used to tell system to start a new log
-    volatile int _awakeCount = 0;
+  volatile bool _logEvent = false;  //Used to test if logging should begin yet
+  volatile bool _newLog = false;    //Used to tell system to start a new log
+  volatile int _awakeCount = 0;
 
-    char _fileNameC[13]; // "logNNNNN.csv" (12 chars) + null terminator
-    char _fileNameStaC[13]; // "staNNNNN.csv", the status file with the same number
-    static const uint8_t MAX_SENSORS = 8;
-    NW_Pages _pages;         // the logger's own Schema 1 pages: 0-1 from EEPROM, 2-3 its reading of itself
-    NW_Report _bootReport;   // what the logger reported at boot, until its row is written
-    bool _sdTestFailed = false; // the boot write-and-read-back on the card failed
-    bool _clockError = false; // the DS3231 did not answer, or its oscillator is stopped
-    bool _bmeError = false;   // the BME280 did not answer
-    unsigned long _logInterval = 0; // seconds, from run(); served on Page 3
-    uint16_t _fileNum = 0;   // the number of the current log and status file pair
-    NW_Sensor* _sensors[MAX_SENSORS]; // sensors whose reports go to the status file (watch())
-    uint8_t _sensorAddress[MAX_SENSORS] = {0}; // where each one is, from watch()
-    uint8_t _numSensors = 0;
-    bool _deviceBootRows = false; // the first reading's boot rows have been written
-    int statusRow(const char* trigger, NW_Sensor& sensor, bool boot); // one device row: time, trigger, printStatus()
-    void reportRows(); // after a reading: the rows the watched sensors' reports call for
-    char _fileNameTestC[11]; // "HWTest.txt" (10 chars) + null terminator
-    bool externalI2COn = false;
-    SdFat _sd;
-    byte  keep_SPCR;
-    byte keep_ADCSRA;
-    uint32_t _sdIndex = 0; // the byte position in the data file after the last row, for a logger that reads rows back (Okapi's backhaul)
-    uint32_t clockUnix(); // Unix seconds from the DS3231's fields, for Page 2 Block 3
+  char _fileNameC[13];     // "logNNNNN.csv" (12 chars) + null terminator
+  char _fileNameStaC[13];  // "staNNNNN.csv", the status file with the same number
+  static const uint8_t MAX_SENSORS = 8;
+  NW_Pages _pages;                              // the logger's own Schema 1 pages: 0-1 from EEPROM, 2-3 its reading of itself
+  NW_Report _bootReport;                        // what the logger reported at boot, until its row is written
+  bool _sdTestFailed = false;                   // the boot write-and-read-back on the card failed
+  bool _clockError = false;                     // the DS3231 did not answer, or its oscillator is stopped
+  bool _bmeError = false;                       // the BME280 did not answer
+  unsigned long _logInterval = 0;               // seconds, from run(); served on Page 3
+  uint16_t _fileNum = 0;                        // the number of the current log and status file pair
+  NW_Sensor* _sensors[MAX_SENSORS];             // sensors whose reports go to the status file (watch())
+  uint8_t _sensorAddress[MAX_SENSORS] = { 0 };  // where each one is, from watch()
+  uint8_t _numSensors = 0;
+  bool _deviceBootRows = false;                                      // the first reading's boot rows have been written
+  int statusRow(const char* trigger, NW_Sensor& sensor, bool boot);  // one device row: time, trigger, printStatus()
+  void reportRows();                                                 // after a reading: the rows the watched sensors' reports call for
+  char _fileNameTestC[11];                                           // "HWTest.txt" (10 chars) + null terminator
+  bool externalI2COn = false;
+  SdFat _sd;
+  byte keep_SPCR;
+  byte keep_ADCSRA;
+  uint32_t _sdIndex = 0;  // the byte position in the data file after the last row, for a logger that reads rows back (Okapi's backhaul)
+  uint32_t clockUnix();   // Unix seconds from the DS3231's fields, for Page 2 Block 3
 };
 
 #endif

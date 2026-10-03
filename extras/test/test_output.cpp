@@ -7,11 +7,11 @@
 // zeroes through String::toInt() and set the clock to the year 2000 in silence.
 #include "Arduino.h"
 #include "Wire.h"
-TwoWire Wire;          // the shared runner links NW_Device.cpp, which wants one
+TwoWire Wire;  // the shared runner links NW_Device.cpp, which wants one
 #include "../../src/NW_TimeStamp.h"
 
 static void parse(const char* what, const char* s) {
-  int v[6] = {-1, -1, -1, -1, -1, -1};
+  int v[6] = { -1, -1, -1, -1, -1, -1 };
   bool ok = nwParseTimeStamp(s, v);
   printf("%-34s ok=%d  ", what, ok);
   if (ok) printf("20%02d-%02d-%02d %02d:%02d:%02d\n", v[0], v[1], v[2], v[3], v[4], v[5]);

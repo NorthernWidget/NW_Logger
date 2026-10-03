@@ -31,18 +31,18 @@ a clock and a board.
  */
 inline bool nwParseTimeStamp(const char* s, int out[6]) {
   if (!s) return false;
-  while (*s == ' ' || *s == '\t' || *s == '\r' || *s == '\n') s++;   //What a terminal adds
-  int values[6] = {0};
+  while (*s == ' ' || *s == '\t' || *s == '\r' || *s == '\n') s++;  //What a terminal adds
+  int values[6] = { 0 };
   for (uint8_t i = 0; i < NW_TIMESTAMP_DIGITS; i++) {
     char c = s[i];
-    if (c < '0' || c > '9') return false;      //Short, or not a stamp at all
+    if (c < '0' || c > '9') return false;  //Short, or not a stamp at all
     int digit = c - '0';
     if (i % 2 == 0) values[i / 2] = 10 * digit;
     else values[i / 2] += digit;
   }
   const char* rest = s + NW_TIMESTAMP_DIGITS;
   while (*rest == ' ' || *rest == '\t' || *rest == '\r' || *rest == '\n') rest++;
-  if (*rest != '\0') return false;             //More than a stamp was sent
+  if (*rest != '\0') return false;  //More than a stamp was sent
   for (uint8_t i = 0; i < 6; i++) out[i] = values[i];
   return true;
 }

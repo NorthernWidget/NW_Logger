@@ -10,16 +10,16 @@ Andy Wickert
 #include <NW_Logger.h>
 #include <Arduino.h>
 
-volatile bool manualLog = false; // Global for interrupt access
+volatile bool manualLog = false;  // Global for interrupt access
 
-volatile uint8_t extIntPin = 255; // external interrupt pin; 255 = not set
+volatile uint8_t extIntPin = 255;  // external interrupt pin; 255 = not set
 const char* ext_int_header_entry = "nInterrupts,";
-volatile bool extIntTripped = false; // Global for the external interrupt
-volatile uint16_t extIntCount = 0; // Global for the external interrupt
+volatile bool extIntTripped = false;  // Global for the external interrupt
+volatile uint16_t extIntCount = 0;    // Global for the external interrupt
 
 NW_Logger* NW_Logger::selfPointer;
 
-ISR (PCINT0_vect) { // handle pin change interrupt for D24-D31 (Port A) on ATmega1284p
+ISR(PCINT0_vect) {  // handle pin change interrupt for D24-D31 (Port A) on ATmega1284p
   // NOTE: PCINT fires on both rising and falling edges. The current
   // implementation sets manualLog unconditionally. If the button is still
   // held when the logger finishes processing and re-enters sleep, the
@@ -31,7 +31,7 @@ ISR (PCINT0_vect) { // handle pin change interrupt for D24-D31 (Port A) on ATmeg
 
 // --- begin() in pieces: a board's begin() calls these in order around its own steps ---
 
-void NW_Logger::acceptAddresses(uint8_t *vals, uint8_t numVals) {
+void NW_Logger::acceptAddresses(uint8_t* vals, uint8_t numVals) {
   i2cTruncated = (numVals > sizeof(_i2cAdr));
   _numAdr = min(numVals, (uint8_t)sizeof(_i2cAdr));
   for (uint8_t i = 0; i < _numAdr; i++) _i2cAdr[i] = vals[i];
@@ -39,19 +39,19 @@ void NW_Logger::acceptAddresses(uint8_t *vals, uint8_t numVals) {
 
 bool NW_Logger::readIdentity() {
   Serial.print("SN = ");
-  int EEPROMLen = EEPROM.length(); //Copy value for faster access
-  int val = 0; //Value to read temp EEPROM values into
-  int pos = 0; //used to keep track of position in SN string
+  int EEPROMLen = EEPROM.length();  //Copy value for faster access
+  int val = 0;                      //Value to read temp EEPROM values into
+  int pos = 0;                      //used to keep track of position in SN string
   // NW-Device-Specification: the stored image (Page 0 identity, Page 1 calibration) occupies the top 64 bytes of EEPROM, Page 0 first.
   // Schema 1 (NW-Provision): serial number = Block 2 (offset 0x10-0x17).
   // Schema 0 (MargaySetup): serial number = the last 8 bytes.
-  int page0 = EEPROMLen - 64; //Schema 1 stored image: Page 0 identity, then Page 1 calibration, at the top of EEPROM (2026-09-23 renumbering)
-  _pages.loadStored(page0); //The logger's own pages: 0 and 1 from EEPROM; 2 and 3 filled at each reading
+  int page0 = EEPROMLen - 64;  //Schema 1 stored image: Page 0 identity, then Page 1 calibration, at the top of EEPROM (2026-09-23 renumbering)
+  _pages.loadStored(page0);    //The logger's own pages: 0 and 1 from EEPROM; 2 and 3 filled at each reading
   const uint8_t* p0 = _pages.page;
   bool schema1 = _pages.page0Valid();
   int snStart = schema1 ? page0 + 0x10 : EEPROMLen - 8;
   for (int i = snStart; i < snStart + 8; i++) {  //Read out Serial Number
-    val = EEPROM.read(i);  //Read SN values as individual bytes from EEPROM
+    val = EEPROM.read(i);                        //Read SN values as individual bytes from EEPROM
     // Load upper and lower nibbles of each EEPROM byte into SN string,
     // post-incrementing the position index each time
     _sn[pos++] = HEX_MAP[(val >> 4)];
@@ -59,16 +59,19 @@ bool NW_Logger::readIdentity() {
     if ((i - snStart) % 2 == 1 && i < snStart + 7) {
       _sn[pos++] = '-';  //Place - between each SN category, post inc pos
     }
-    _sn[19] = '\0'; //Null terminate string
+    _sn[19] = '\0';  //Null terminate string
   }
 
-  Serial.print(_sn); //Print compiled string
+  Serial.print(_sn);  //Print compiled string
   if (schema1) {
     Serial.print("  (Schema 1, HW v");
-    Serial.print(p0[0x08]); Serial.print("."); Serial.print(p0[0x09]); Serial.print(")");
-    snprintf(_hwVersion, sizeof(_hwVersion), "%u.%u", p0[0x08], p0[0x09]); //For the status file's boot row
+    Serial.print(p0[0x08]);
+    Serial.print(".");
+    Serial.print(p0[0x09]);
+    Serial.print(")");
+    snprintf(_hwVersion, sizeof(_hwVersion), "%u.%u", p0[0x08], p0[0x09]);  //For the status file's boot row
   }
-  if (!schema1) _pages.latchFault(0xE3); //Page 0 invalid: unprovisioned or corrupt
+  if (!schema1) _pages.latchFault(0xE3);  //Page 0 invalid: unprovisioned or corrupt
   if (strcmp(_sn, "FFFF-FFFF-FFFF-FFFF") == 0)
     Serial.println("WARNING: no serial number programmed in EEPROM");
   return schema1;
@@ -76,32 +79,32 @@ bool NW_Logger::readIdentity() {
 
 void NW_Logger::serialTimeSet() {
   Serial.print("\n\n");
-  Serial.println("\nInitializing...\n"); //DEBUG!
+  Serial.println("\nInitializing...\n");  //DEBUG!
   delay(100);
   if (Serial.available()) {  //If time setting info available
     //A stamp is twelve digits; the buffer holds what a terminal adds to them.
-    char dateTimeTemp[20] = {0};
+    char dateTimeTemp[20] = { 0 };
     size_t n = Serial.readBytes(dateTimeTemp, sizeof(dateTimeTemp) - 1);
     dateTimeTemp[n] = '\0';
     Serial.println(dateTimeTemp);  //DEBUG!
-    int dateTimeVals[6] = {0};
+    int dateTimeVals[6] = { 0 };
     if (nwParseTimeStamp(dateTimeTemp, dateTimeVals)) {
       for (int i = 0; i < 6; i++) {
-        Serial.print(i); Serial.print("  "); //DEBUG!
-        Serial.println(dateTimeVals[i]); //DEBUG!
+        Serial.print(i);
+        Serial.print("  ");               //DEBUG!
+        Serial.println(dateTimeVals[i]);  //DEBUG!
       }
       _rtc.setTime(2000 + dateTimeVals[0], dateTimeVals[1], dateTimeVals[2],
-                  dateTimeVals[3], dateTimeVals[4], dateTimeVals[5]);
-      _pages.latchNotice(0x30); //ClockSet
-    }
-    else {
+                   dateTimeVals[3], dateTimeVals[4], dateTimeVals[5]);
+      _pages.latchNotice(0x30);  //ClockSet
+    } else {
       //The clock keeps the time it had. Saying so matters: the old code read a
       //malformed stamp as zeroes and set the clock to the year 2000 in silence.
       Serial.println(F("Not a YYMMDDHHMMSS timestamp: the clock is unchanged"));
     }
   }
 
-  getTime(); //Get time to pass to computer
+  getTime();  //Get time to pass to computer
   Serial.print("\nTimestamp = ");
   Serial.println(_logTimeDate);
 }
@@ -119,17 +122,16 @@ void NW_Logger::attachLoggerInterrupts(bool buttonOnPCINT) {
 
   pinMode(SD_CS, OUTPUT);
 
-  SdFile::dateTimeCallback(dateTimeSD); //Setup SD file time setting
+  SdFile::dateTimeCallback(dateTimeSD);  //Setup SD file time setting
   // Attach ISR driven by RTC interrupt; triggers data logging each interval
   attachInterrupt(digitalPinToInterrupt(RTCInt), NW_Logger::isr1, FALLING);
   if (!buttonOnPCINT) {
     // Attach ISR driven by manual log button, sets logging flag and logs data
     attachInterrupt(digitalPinToInterrupt(LogInt), NW_Logger::isr0, FALLING);
-  }
-  else { //Margay v2.0 and up, Okapi: PCINT for log button (LogInt = D28, PA4); enable pin first
-    *digitalPinToPCMSK(LogInt) |= bit(digitalPinToPCMSKbit(LogInt)); // enable
-    PCIFR |= bit(digitalPinToPCICRbit(LogInt)); // clear outstanding interrupt
-    PCICR |= bit(digitalPinToPCICRbit(LogInt)); // enable interrupt group
+  } else {                                                            //Margay v2.0 and up, Okapi: PCINT for log button (LogInt = D28, PA4); enable pin first
+    *digitalPinToPCMSK(LogInt) |= bit(digitalPinToPCMSKbit(LogInt));  // enable
+    PCIFR |= bit(digitalPinToPCICRbit(LogInt));                       // clear outstanding interrupt
+    PCICR |= bit(digitalPinToPCICRbit(LogInt));                       // enable interrupt group
   }
   pinMode(RTCInt, INPUT_PULLUP);
   pinMode(LogInt, INPUT);
@@ -139,7 +141,7 @@ void NW_Logger::ledReport() {
   digitalWrite(AuxLED, HIGH);
 
   if (_onBoardError) {
-    LED_Color(RED); //On board failure
+    LED_Color(RED);  //On board failure
     delay(2000);
   }
   if (_sensorError) {
@@ -147,11 +149,11 @@ void NW_Logger::ledReport() {
     delay(2000);
   }
   if (_timeError) {
-    LED_Color(CYAN); //Time set error
+    LED_Color(CYAN);  //Time set error
     delay(2000);
   }
   if (_sdCardMissing) {
-    LED_Color(PURPLE); //Sd card not inserted
+    LED_Color(PURPLE);  //Sd card not inserted
     delay(2000);
   }
   // Battery voltage is below level where hardware functionality
@@ -168,7 +170,7 @@ void NW_Logger::ledReport() {
   // Battery charge % is at a concerning level; recommend replacing batteries
   if (_batWarning && !_batError) {
     for (int i = 0; i < 10; i++) {
-      LED_Color(GOLD); //Low battery charge warning
+      LED_Color(GOLD);  //Low battery charge warning
       delay(100);
       LED_Color(OFF);
       delay(100);
@@ -199,11 +201,11 @@ bool NW_Logger::begin() {
   uint8_t adr[MAX_SENSORS];
   uint8_t n = 0;
   for (uint8_t i = 0; i < _numSensors; i++) {
-    if (_sensors[i] == this) continue;     //a logger is not found at an address
+    if (_sensors[i] == this) continue;  //a logger is not found at an address
     if (_sensorAddress[i]) adr[n++] = _sensorAddress[i];
   }
-  bool ok = beginBoard(adr, n); //The board's own hardware start
-  _begun = true;                //The sensor rail and the bus switch are up
+  bool ok = beginBoard(adr, n);  //The board's own hardware start
+  _begun = true;                 //The sensor rail and the bus switch are up
   return ok;
 }
 
@@ -274,14 +276,13 @@ void NW_Logger::SDtest() {
   bool cardNotPresent = digitalRead(SD_CD);
 
   Serial.print("SD: ");
-  delay(5); //DEBUG!
+  delay(5);  //DEBUG!
   if (cardNotPresent) {
     Serial.println(F(" NO CARD"));
     sdTestFailed = true;
     _sdTestFailed = true;
-    _sdCardMissing = true; //Card not inserted
-  }
-  else if (!_sd.begin(SD_CS)) {
+    _sdCardMissing = true;  //Card not inserted
+  } else if (!_sd.begin(SD_CS)) {
     _onBoardError = true;
     sdTestFailed = true;
     _sdTestFailed = true;
@@ -289,18 +290,18 @@ void NW_Logger::SDtest() {
 
   // If card is present and initialised successfully, do the following:
   if (!cardNotPresent && !sdTestFailed) {
-    _sd.chdir("/"); //The card's root
-    _sd.mkdir(_sn); //Make directory with serial number as name: everything this logger writes lives in it
-    _sd.chdir(_sn); //Move into this directory
+    _sd.chdir("/");  //The card's root
+    _sd.mkdir(_sn);  //Make directory with serial number as name: everything this logger writes lives in it
+    _sd.chdir(_sn);  //Move into this directory
     strlcpy(_fileNameTestC, "HWTest.txt", sizeof(_fileNameTestC));
-    _sd.remove(_fileNameTestC); //Remove any previous files
+    _sd.remove(_fileNameTestC);  //Remove any previous files
 
     // Seed with a random process to ensure randomness
     randomSeed(analogRead(A7));
     // Generate a random number between 1 and 30557
     // (the number of words in Hamlet); start at 1 to avoid log10(0)
     int randVal = random(1, 30557);
-    char randDigits[6] = {0};
+    char randDigits[6] = { 0 };
     // Convert randVal into a series of digits
     sprintf(randDigits, "%d", randVal);
     // +1: println appends \r; loop uses randLength-1 to skip it
@@ -313,11 +314,11 @@ void NW_Logger::SDtest() {
       dataWrite.println("-Hamlet, Act 1, Scene 2");
     }
     dataWrite.close();
-    char testDigits[6] = {0};
+    char testDigits[6] = { 0 };
     File dataRead = _sd.open(_fileNameTestC, FILE_READ);
     if (dataRead) {
       dataRead.read(testDigits, randLength);
-      for (int i = 0; i < randLength - 1; i++){ //Test random value string
+      for (int i = 0; i < randLength - 1; i++) {  //Test random value string
         if (testDigits[i] != randDigits[i]) {
           sdTestFailed = true;
           _sdTestFailed = true;
@@ -327,7 +328,7 @@ void NW_Logger::SDtest() {
     }
     dataRead.close();
 
-    keep_SPCR=SPCR;
+    keep_SPCR = SPCR;
   }
 
   // If card is inserted and still does not connect properly, throw error
@@ -347,13 +348,13 @@ void NW_Logger::clockTest() {
   error = Wire.endTransmission();
 
   if (error == 0) {
-    getTime(); //FIX!
+    getTime();  //FIX!
     testSeconds = _rtc.getValue(5);
     delay(1100);
     if (_rtc.getValue(5) == testSeconds) {
-      _onBoardError = true; // If clock is not incrementing
+      _onBoardError = true;  // If clock is not incrementing
       _clockError = true;
-      oscStop = true;      // Oscillator not running
+      oscStop = true;  // Oscillator not running
       Serial.println(" FAIL (oscillator stopped)");
     }
     if (!oscStop) {
@@ -385,8 +386,8 @@ void NW_Logger::initLogFile() {
     fileNum += 1;
     snprintf(_fileNameC, sizeof(_fileNameC), "log%05d.csv", fileNum);
   }
-  snprintf(_fileNameStaC, sizeof(_fileNameStaC), "sta%05d.csv", fileNum); //The status file, same number
-  if (_fileNum != 0) _pages.latchNotice(0xF1); //NewLogFile: a later pair, not the first
+  snprintf(_fileNameStaC, sizeof(_fileNameStaC), "sta%05d.csv", fileNum);  //The status file, same number
+  if (_fileNum != 0) _pages.latchNotice(0xF1);                             //NewLogFile: a later pair, not the first
   _fileNum = fileNum;
   Serial.print("FileNameC: ");
   Serial.println(_fileNameC);
@@ -421,11 +422,11 @@ void NW_Logger::initLogFile() {
 
 
 
-void NW_Logger::LED_Color(unsigned long val) { //Set color of onboard led
-  int red = 0; //red led color
-  int green = 0;  //green led color
-  int blue = 0;  //blue led color
-  int lum = 0;  //Luminosity
+void NW_Logger::LED_Color(unsigned long val) {  //Set color of onboard led
+  int red = 0;                                  //red led color
+  int green = 0;                                //green led color
+  int blue = 0;                                 //blue led color
+  int lum = 0;                                  //Luminosity
 
   //Parse all values from single val
   blue = val & 0xFF;
@@ -434,9 +435,9 @@ void NW_Logger::LED_Color(unsigned long val) { //Set color of onboard led
   lum = (val >> 24) & 0xFF;
   //  lum = 255 - lum; //Invert since LEDs are open drain
 
-  analogWrite(RedLED, 255 - (red * lum)/0xFF);
-  analogWrite(GreenLED, 255 - (green * lum)/0xFF);
-  analogWrite(BlueLED, 255 - (blue * lum)/0xFF);
+  analogWrite(RedLED, 255 - (red * lum) / 0xFF);
+  analogWrite(GreenLED, 255 - (green * lum) / 0xFF);
+  analogWrite(BlueLED, 255 - (blue * lum) / 0xFF);
 }
 
 uint32_t NW_Logger::clockUnix() {
@@ -460,67 +461,67 @@ void NW_Logger::getTime() {
 
 void NW_Logger::blinkGood() {
   // Peppy blinky pattern to show that the logger has successfully initialized
-  digitalWrite(BlueLED,LOW);
+  digitalWrite(BlueLED, LOW);
   delay(651);
-  digitalWrite(BlueLED,HIGH);
+  digitalWrite(BlueLED, HIGH);
   delay(300);
-  digitalWrite(BlueLED,LOW);
+  digitalWrite(BlueLED, LOW);
   delay(100);
-  digitalWrite(BlueLED,HIGH);
+  digitalWrite(BlueLED, HIGH);
   delay(200);
-  digitalWrite(BlueLED,LOW);
+  digitalWrite(BlueLED, LOW);
   delay(100);
-  digitalWrite(BlueLED,HIGH);
+  digitalWrite(BlueLED, HIGH);
 }
 
 // Pass in function which returns string of data
 
 void NW_Logger::run(unsigned long logInterval) {
-  _logInterval = logInterval; //Served on Page 3
+  _logInterval = logInterval;  //Served on Page 3
   // Print note that that logging has started
   // Serial.println("Log Started!"); //DEBUG!
   // Serial.println(millis()); //DEBUG!
   if (_newLog) {
     // LogEvent = true;
     _rtc.setAlarm(logInterval);
-    initLogFile(); //Start a new file each time log button is pressed
+    initLogFile();  //Start a new file each time log button is pressed
     //Add inital data point
     addDataPoint();
     _newLog = false;  //Clear flag once log is started
-    blinkGood();  //Alert user to start of log
-    resetWDT(); //Clear alarm
+    blinkGood();      //Alert user to start of log
+    resetWDT();       //Clear alarm
   }
 
   if (_logEvent) {
     // Serial.println("Log Event!"); //DEBUG!
     // RTC.setAlarm(logInterval);  //Set/reset alarm //DEBUG!
-    addDataPoint(); //Write values to SD
-    afterLogEvent(); //A board's follow-up to the alarm-driven row (Okapi's backhaul)
-    _logEvent = false; //Clear log flag
+    addDataPoint();              //Write values to SD
+    afterLogEvent();             //A board's follow-up to the alarm-driven row (Okapi's backhaul)
+    _logEvent = false;           //Clear log flag
     _rtc.setAlarm(logInterval);  //Set/reset alarm
-    resetWDT(); //Clear alarm
+    resetWDT();                  //Clear alarm
   }
 
   // Write data to SD card without interrupting existing timing cycle
   if (manualLog) {
     // Serial.println("Click!"); //DEBUG!
-    addDataPoint(); //write values to SD
-    manualLog = false; //Clear log flag
-    resetWDT(); //Clear alarm
+    addDataPoint();     //write values to SD
+    manualLog = false;  //Clear log flag
+    resetWDT();         //Clear alarm
   }
 
   if (extIntTripped) {  // Defaults to just counter for now
     // Serial.println("TIP!"); //DEBUG!
-    extIntCount ++;
-    extIntTripped = false; // Clear interrupt flag
-    resetWDT(); //Clear alarm
-    delay(150); //Hard-code for now; tipping bucket "debounce"
+    extIntCount++;
+    extIntTripped = false;  // Clear interrupt flag
+    resetWDT();             //Clear alarm
+    delay(150);             //Hard-code for now; tipping bucket "debounce"
     attachInterrupt(digitalPinToInterrupt(extIntPin), NW_Logger::isr2, FALLING);
   }
 
-  if (!digitalRead(RTCInt)) {  //Catch alarm if not reset properly
-    Serial.println("Reset Alarm"); //DEBUG!
-    _rtc.setAlarm(logInterval); //Turn alarm back on
+  if (!digitalRead(RTCInt)) {       //Catch alarm if not reset properly
+    Serial.println("Reset Alarm");  //DEBUG!
+    _rtc.setAlarm(logInterval);     //Turn alarm back on
   }
 
   _awakeCount++;
@@ -537,9 +538,9 @@ void NW_Logger::run(unsigned long logInterval) {
 
 // Send a pulse to "feed" the watchdog timer
 void NW_Logger::resetWDT() {
-  if (WDHold == 255) return; // No watchdog timer on this board model
-  digitalWrite(WDHold, HIGH); //Set DONE pin high
-  delayMicroseconds(5); //Wait a short pulse
+  if (WDHold == 255) return;   // No watchdog timer on this board model
+  digitalWrite(WDHold, HIGH);  //Set DONE pin high
+  delayMicroseconds(5);        //Wait a short pulse
   digitalWrite(WDHold, LOW);
 }
 
@@ -550,15 +551,14 @@ void NW_Logger::switchExternalI2C(bool desiredState) {
   */
   pinMode(I2C_SW, OUTPUT);
 
-  if ( desiredState == ON ) {
+  if (desiredState == ON) {
     digitalWrite(I2C_SW, HIGH);
     externalI2COn = digitalRead(I2C_SW);
-  }
-  else {
+  } else {
     digitalWrite(I2C_SW, LOW);
     externalI2COn = digitalRead(I2C_SW);
   }
-  delay(1); // Any time needed to switch states; may not be necessary
+  delay(1);  // Any time needed to switch states; may not be necessary
 }
 
 void NW_Logger::farmGateI2C(bool initStateI2C) {
@@ -571,10 +571,16 @@ void NW_Logger::farmGateI2C(bool initStateI2C) {
   switchExternalI2C(initStateI2C);
 }
 
-uint8_t NW_Logger::reportKind()    { return _pages.report().kind(); }
-bool    NW_Logger::reportIsFault() { return _pages.report().isFault(); }
-uint8_t NW_Logger::bootReportKind() { return _bootReport.kind(); }
-void    NW_Logger::clearBootReport() {
+uint8_t NW_Logger::reportKind() {
+  return _pages.report().kind();
+}
+bool NW_Logger::reportIsFault() {
+  return _pages.report().isFault();
+}
+uint8_t NW_Logger::bootReportKind() {
+  return _bootReport.kind();
+}
+void NW_Logger::clearBootReport() {
   _bootReport.code = 0;
   _bootReport.status = 0;
 }
@@ -607,7 +613,7 @@ static bool nameMatches(const uint8_t* page, const char* name) {
     if ((char)page[1 + i] != name[i]) return false;
   }
   for (; i < 7; i++) {
-    if (page[1 + i] != 0) return false;   //the rest of the field is padding
+    if (page[1 + i] != 0) return false;  //the rest of the field is padding
   }
   return true;
 }
@@ -626,7 +632,7 @@ uint8_t NW_Logger::scan(Print& out) {
   bool initialStateExternalI2C = digitalRead(I2C_SW);
   switchExternalI2C(ON);
 
-  NW_Pages p;                        //borrowed for page0Valid() and its CRC-8
+  NW_Pages p;  //borrowed for page0Valid() and its CRC-8
   uint8_t answered = 0, identified = 0;
   out.println(F("I2C scan:"));
   for (uint8_t adr = 0x08; adr <= 0x77; adr++) {
@@ -686,7 +692,7 @@ uint8_t NW_Logger::discover(NW_Sensor** candidates, uint8_t n) {
   bool initialStateExternalI2C = digitalRead(I2C_SW);
   switchExternalI2C(ON);
 
-  NW_Pages p;                        //borrowed for page0Valid() and its CRC-8
+  NW_Pages p;  //borrowed for page0Valid() and its CRC-8
   uint8_t found = 0;
   //Address order, which is therefore column order, and the bus is walked only
   //as far as there are slots left to hold what it finds.
@@ -729,10 +735,10 @@ size_t NW_Logger::printFileHeader(Print& out) {
 
 void NW_Logger::noteFrom(NW_Sensor& sensor, bool beginFailed) {
   //One sensor's word into the Note column, semicolon-separated as note() does.
-  NW_BufferPrint p(_note, NOTE_CAPACITY, true);   //append to this row's notes
+  NW_BufferPrint p(_note, NOTE_CAPACITY, true);  //append to this row's notes
   if (p.length() > 0) p.print(';');
   sensor.printNote(p, beginFailed);
-  if (p.truncated()) _pages.latchNotice(0xF3);   //NoteTruncated: the row's notes did not fit
+  if (p.truncated()) _pages.latchNotice(0xF3);  //NoteTruncated: the row's notes did not fit
   Serial.print(F("Note: "));
   Serial.println(_note);
 }
@@ -743,7 +749,7 @@ void NW_Logger::readSensors() {
   //asked for a reading, and whichever step refuses puts its word in the Note
   //column: that is what the sketch's update() used to do by hand.
   for (uint8_t i = 0; i < _numSensors; i++) {
-    if (_sensors[i] == this) continue;   //the logger reads its own channels below
+    if (_sensors[i] == this) continue;  //the logger reads its own channels below
     NW_Sensor& s = *_sensors[i];
     if (!s.wake(_sensorAddress[i])) {
       noteFrom(s, true);
@@ -752,7 +758,7 @@ void NW_Logger::readSensors() {
     if (!s.acquire()) noteFrom(s, false);
     else if (s.reportKind() != 0) noteFrom(s, false);
   }
-  acquire();                          //this logger's own channels, last
+  acquire();  //this logger's own channels, last
 }
 
 int NW_Logger::logRow() {
@@ -770,7 +776,7 @@ int NW_Logger::logRow() {
   }
   DataFile.print(_note);
   DataFile.println();
-  _sdIndex = DataFile.position();     //Where the next row starts
+  _sdIndex = DataFile.position();  //Where the next row starts
   DataFile.close();
 
   //The monitor gets the same row. printDataRow() prints stored values, so a
@@ -781,7 +787,7 @@ int NW_Logger::logRow() {
     _sensors[i]->printDataRow(Serial);
   }
   Serial.println(_note);
-  _note[0] = '\0';                     //One row's worth of notes
+  _note[0] = '\0';  //One row's worth of notes
   return 0;
 }
 
@@ -800,7 +806,8 @@ int NW_Logger::statusRow(const char* trigger, NW_Sensor& sensor, bool boot) {
   if (!StatusFile) return -1;
   StatusFile.print(_logTimeDate);
   StatusFile.print(',');
-  StatusFile.print(trigger); StatusFile.print(',');
+  StatusFile.print(trigger);
+  StatusFile.print(',');
   sensor.printStatus(StatusFile, boot);
   StatusFile.println();
   StatusFile.close();
@@ -813,13 +820,13 @@ void NW_Logger::reportRows() {
   //report captured with the reading, gets one. The first reading writes every
   //watched sensor's boot row regardless, as the record of what is on the bus.
   for (int8_t i = -1; i < (int8_t)_numSensors; i++) {
-    NW_Sensor& s = (i < 0) ? *this : *_sensors[i]; //The logger itself first
+    NW_Sensor& s = (i < 0) ? *this : *_sensors[i];  //The logger itself first
     uint8_t bootKind = s.bootReportKind();
     if (!_deviceBootRows || (bootKind != 0 && bootKind != 6)) statusRow("boot", s, true);
     s.clearBootReport();
     if (s.reportKind() != 0) statusRow("report", s, false);
   }
-  _pages.acknowledge(); //The logger's own report is written; the next one may latch
+  _pages.acknowledge();  //The logger's own report is written; the next one may latch
   _deviceBootRows = true;
 }
 
@@ -827,7 +834,7 @@ void NW_Logger::note(const char* word) {
   NW_BufferPrint p(_note, NOTE_CAPACITY, true);
   if (p.length() > 0) p.print(';');
   p.print(word);
-  if (p.truncated()) _pages.latchNotice(0xF3);   //NoteTruncated
+  if (p.truncated()) _pages.latchNotice(0xF3);  //NoteTruncated
   Serial.print(F("Note: "));
   Serial.println(word);
   LED_Color(ORANGE);
@@ -838,7 +845,7 @@ void NW_Logger::note(const char* word) {
 void NW_Logger::buttonLog() {
   // ISR to respond to pressing log button and waking device from sleep
   // and starting log
-  manualLog = true; //Set flag to manually record an additional data point
+  manualLog = true;  //Set flag to manually record an additional data point
 }
 
 void NW_Logger::extIntCounter() {
@@ -850,7 +857,7 @@ void NW_Logger::extIntCounter() {
 
 void NW_Logger::writeDataToSD() {
   //Write global data to SD
-  _logEvent = true; //Set flag for a log event
+  _logEvent = true;  //Set flag for a log event
   _awakeCount = 0;
 }
 
@@ -899,6 +906,12 @@ void NW_Logger::dateTimeSD(uint16_t* date, uint16_t* time) {
                    selfPointer->_rtc.getValue(5));
 }
 
-void NW_Logger::isr0() { selfPointer->buttonLog(); }
-void NW_Logger::isr1() { selfPointer->writeDataToSD(); }
-void NW_Logger::isr2() { selfPointer->extIntCounter(); }
+void NW_Logger::isr0() {
+  selfPointer->buttonLog();
+}
+void NW_Logger::isr1() {
+  selfPointer->writeDataToSD();
+}
+void NW_Logger::isr2() {
+  selfPointer->extIntCounter();
+}
