@@ -1,0 +1,22 @@
+# Commits to skip when reading blame: bulk reformatting and mechanical
+# renames, which change no instruction and would otherwise hide who wrote
+# a line. git honours this with --ignore-revs-file, and GitHub reads it
+# from the repository root by itself.
+#
+#   git blame --ignore-revs-file=.git-blame-ignore-revs <file>
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs   (once, per clone)
+#
+# Measured before this was written: plain blame credited Bobby Schulz with
+# 14 of Margay.cpp's lines where 206 are his, and 27 of Walrus_I2C.cpp's
+# where 86 keep his phrasing verbatim. That is what this file repairs.
+
+# Arduino's clang-format applied to the library (byte-identical .hex)
+899a9a19a36d1c88635712cefe2ba23e81679555
+# comment form only: //Comment without a space
+73f6ea963ba92e6df42ad0a5ec72841e57ea3dc1
+# one statement per line, no logic changed
+07916d74a8e889ece8cda9cf9c28608347b7fc7d
+# mechanical member rename to _camelCase
+a0d4cef6926a78018621947582bd0fa047642d17
+# mechanical rename: _watched became _sensors
+7d3de5a5a114e17d5e83413d857892d49817a26c
