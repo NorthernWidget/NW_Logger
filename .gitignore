@@ -1,0 +1,3 @@
+# host-side test harness outputs
+extras/test/nw_logger_test
+extras/test/output.txt
