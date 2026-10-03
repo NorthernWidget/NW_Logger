@@ -1,0 +1,14 @@
+261107140509                       ok=1  2026-11-07 14:05:09
+with CR LF                         ok=1  2026-11-07 14:05:09
+with a newline alone               ok=1  2026-11-07 14:05:09
+with spaces around it              ok=1  2026-11-07 14:05:09
+260101000000                       ok=1  2026-01-01 00:00:00
+261231235959                       ok=1  2026-12-31 23:59:59
+empty                              ok=0  (untouched: -1 -1 -1 -1 -1 -1)
+eleven digits                      ok=0  (untouched: -1 -1 -1 -1 -1 -1)
+a letter in the middle             ok=0  (untouched: -1 -1 -1 -1 -1 -1)
+a space in the middle              ok=0  (untouched: -1 -1 -1 -1 -1 -1)
+thirteen digits                    ok=0  (untouched: -1 -1 -1 -1 -1 -1)
+a stamp and a word                 ok=0  (untouched: -1 -1 -1 -1 -1 -1)
+a sentence                         ok=0  (untouched: -1 -1 -1 -1 -1 -1)
+the null pointer                   ok=0  (untouched: -1 -1 -1 -1 -1 -1)

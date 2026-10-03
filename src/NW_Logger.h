@@ -19,6 +19,7 @@ Andy Wickert
 #include <avr/power.h>
 #include <EEPROM.h>
 #include <NW_Core.h>   // NW_Sensor: the view the status file takes of a sensor; NW_Pages: the logger's own pages
+#include "NW_TimeStamp.h"   // the twelve-digit stamp the clock is set from
 #include "DS3231_Logger.h"
 #include "SdFat.h"
 #include <NW_BME280.h>

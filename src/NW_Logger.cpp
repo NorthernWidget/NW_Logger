@@ -79,17 +79,26 @@ void NW_Logger::serialTimeSet() {
   Serial.println("\nInitializing...\n"); //DEBUG!
   delay(100);
   if (Serial.available()) {  //If time setting info available
-    String dateTimeTemp = Serial.readString();
+    //A stamp is twelve digits; the buffer holds what a terminal adds to them.
+    char dateTimeTemp[20] = {0};
+    size_t n = Serial.readBytes(dateTimeTemp, sizeof(dateTimeTemp) - 1);
+    dateTimeTemp[n] = '\0';
     Serial.println(dateTimeTemp);  //DEBUG!
     int dateTimeVals[6] = {0};
-    for (int i = 0; i < 6; i++) {
-      dateTimeVals[i] = dateTimeTemp.substring(2*i, 2*(i+1)).toInt();
-      Serial.print(i); Serial.print("  "); //DEBUG!
-      Serial.println(dateTimeVals[i]); //DEBUG!
+    if (nwParseTimeStamp(dateTimeTemp, dateTimeVals)) {
+      for (int i = 0; i < 6; i++) {
+        Serial.print(i); Serial.print("  "); //DEBUG!
+        Serial.println(dateTimeVals[i]); //DEBUG!
+      }
+      _rtc.setTime(2000 + dateTimeVals[0], dateTimeVals[1], dateTimeVals[2],
+                  dateTimeVals[3], dateTimeVals[4], dateTimeVals[5]);
+      _pages.latchNotice(0x30); //ClockSet
     }
-    _rtc.setTime(2000 + dateTimeVals[0], dateTimeVals[1], dateTimeVals[2],
-                dateTimeVals[3], dateTimeVals[4], dateTimeVals[5]);
-    _pages.latchNotice(0x30); //ClockSet
+    else {
+      //The clock keeps the time it had. Saying so matters: the old code read a
+      //malformed stamp as zeroes and set the clock to the year 2000 in silence.
+      Serial.println("Not a YYMMDDHHMMSS timestamp: the clock is unchanged");
+    }
   }
 
   getTime(); //Get time to pass to computer
