@@ -443,9 +443,10 @@ uint32_t NW_Logger::clockUnix() {
 }
 
 void NW_Logger::getTime() {
-  //Update global time string
-  //getTime() answers a String; copy it into the buffer the rows print from.
-  strlcpy(_logTimeDate, _rtc.getTime(0).c_str(), sizeof(_logTimeDate));
+  //Read the clock and write the timestamp straight into the buffer the rows
+  //print from. Mode 0 is nineteen characters, which _logTimeDate holds exactly.
+  _rtc.readTime();
+  _rtc.formatTime(_logTimeDate, sizeof(_logTimeDate), 0);
 }
 
 void NW_Logger::blinkGood() {
