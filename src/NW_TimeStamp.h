@@ -20,11 +20,19 @@ a clock and a board.
 /**
  * @brief Read a "YYMMDDHHMMSS" stamp into six integers.
  * @details Year (two digits, the century is the caller's), month, day, hour,
- * minute, second. Leading and trailing whitespace, carriage returns and
- * newlines are ignored, which is what a terminal adds. Nothing else is: a stamp
- * with a non-digit in it, or with fewer than twelve digits, is refused rather
- * than read as far as it goes. The fields are not range-checked here; the clock
- * rejects what it cannot hold.
+ * minute, second.
+ *
+ * **Twelve digits, then anything that is not a digit.** The senders in use end
+ * the stamp differently and the protocol never said which: SetTime_GUI's
+ * NW_Logger_TimeSet appends an `x` (`LoggerSetTime()` in its `.pde`), a terminal
+ * appends a carriage return and a newline, and a hand-typed stamp ends with
+ * nothing at all. All three are accepted, because what a sender puts after the
+ * field is its own business.
+ *
+ * A thirteenth digit is refused: that is a field of the wrong length rather than
+ * a terminator, and reading the first twelve of it would drop a digit in
+ * silence. So is a non-digit inside the field, and a field shorter than twelve.
+ * The fields are not range-checked here; the clock rejects what it cannot hold.
  * @param s The received characters, zero-terminated.
  * @param out Six values, written only when the whole stamp is good.
  * @return True when `s` held exactly a stamp.
@@ -42,7 +50,9 @@ inline bool nwParseTimeStamp(const char* s, int out[6]) {
   }
   const char* rest = s + NW_TIMESTAMP_DIGITS;
   while (*rest == ' ' || *rest == '\t' || *rest == '\r' || *rest == '\n') rest++;
-  if (*rest != '\0') return false;  //More than a stamp was sent
+  //Whatever follows the field is the sender's terminator, whichever it chose.
+  //A digit is the one thing it may not be: that is a field of the wrong length.
+  if (*rest >= '0' && *rest <= '9') return false;  //Thirteen digits: not a stamp
   for (uint8_t i = 0; i < 6; i++) out[i] = values[i];
   return true;
 }

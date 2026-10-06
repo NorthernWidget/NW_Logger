@@ -19,7 +19,11 @@ static void parse(const char* what, const char* s) {
 }
 
 int main() {
-  // 1. What a terminal sends, and what it sends with a line ending on it.
+  // 1. What each sender in use actually sends. SetTime_GUI appends an 'x', a
+  //    terminal appends CR LF, and a hand-typed stamp ends with nothing. The
+  //    'x' is from LoggerSetTime() in NW_Logger_TimeSet.pde, and refusing it was
+  //    a live regression until this test went in.
+  parse("SetTime_GUI: 12 digits then 'x'", "261107140509x");
   parse("261107140509", "261107140509");
   parse("with CR LF", "261107140509\r\n");
   parse("with a newline alone", "261107140509\n");
@@ -36,8 +40,8 @@ int main() {
   parse("eleven digits", "26110714050");
   parse("a letter in the middle", "2611o7140509");
   parse("a space in the middle", "261107 40509");
-  parse("thirteen digits", "2611071405099");
-  parse("a stamp and a word", "261107140509 now");
+  parse("thirteen digits", "2611071405099");        // a field of the wrong length, not a terminator
+  parse("a stamp and a word", "261107140509 now");  // twelve good digits; the rest is terminator
   parse("a sentence", "set the clock please");
   parse("the null pointer", nullptr);
 
