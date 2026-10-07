@@ -12,4 +12,5 @@ a space in the middle              ok=0  (untouched: -1 -1 -1 -1 -1 -1)
 thirteen digits                    ok=0  (untouched: -1 -1 -1 -1 -1 -1)
 a stamp and a word                 ok=1  2026-11-07 14:05:09
 a sentence                         ok=0  (untouched: -1 -1 -1 -1 -1 -1)
+ALog: yymmddDhhmmssx               ok=0  (untouched: -1 -1 -1 -1 -1 -1)
 the null pointer                   ok=0  (untouched: -1 -1 -1 -1 -1 -1)

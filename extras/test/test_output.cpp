@@ -43,6 +43,14 @@ int main() {
   parse("thirteen digits", "2611071405099");        // a field of the wrong length, not a terminator
   parse("a stamp and a word", "261107140509 now");  // twelve good digits; the rest is terminator
   parse("a sentence", "set the clock please");
+
+  // 4. The ALog's format, which is a different device's and must not be read as
+  //    ours. ALogTalk/usbserial.py's DS3231_set() sends yymmdd D hhmmss x, with a
+  //    day-of-week digit between the date and the time (Eric Ayars' DS3231
+  //    convention). Taking its first twelve characters would put the day of week
+  //    into the hour and shift everything after it, so a thirteenth digit is
+  //    refused: better a clock that did not move than one that moved wrongly.
+  parse("ALog: yymmddDhhmmssx", "2611071140509x");
   parse("the null pointer", nullptr);
 
   return 0;
