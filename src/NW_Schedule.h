@@ -58,6 +58,16 @@ replaces: `now + interval` is always ahead and always wandering, and
  * alone consumes it and leaves nothing for the traffic. Raise this if the arming
  * path ever grows; correctness does not rest on the number, because the caller
  * reads the clock back after arming and re-arms if the instant passed anyway.
+ *
+ * **What it costs the schedule.** A wake is pushed to the following slot whenever
+ * a cycle ends within the guard of the next grid point, which for whole seconds
+ * is `guard - 1` of every `step` arrival phases: one slot in 900 at a 15-minute
+ * interval, one in 10 at a 10-second interval, one in 3 at a 3-second interval.
+ * So the guard is free at the intervals a logger uses and costly only at the
+ * shortest ones. Below the guard itself it is worse than costly: every wake would
+ * be pushed and the logger would keep the guard's cadence rather than the one
+ * asked for, which is why nwScheduleHolds() refuses a step under the guard
+ * instead of quietly halving the rate (Andy, 2026-10-09).
  */
 #define NW_ALARM_GUARD_SECONDS 2UL
 
@@ -111,11 +121,17 @@ inline uint32_t nwNextWake(uint32_t secondsIntoDay, uint32_t step, uint32_t guar
  * the backup land on the grid: a rescued row is then indistinguishable from an
  * ordinary one, and a lost interrupt costs exactly one row.
  *
- * The result is never earlier than one full cycle after the primary, because
- * rounding to a whole minute only ever moves it later (by up to 58 s at the
- * sub-minute steps). So the backup cannot fire inside the cycle that armed it
- * unless one cycle is itself shorter than a cycle takes, which is the
+ * The instant is **the earliest grid point at or after one full increment past
+ * the primary that alarm 2 can express**, which is `next + step` exactly for
+ * every step of 30 s or more. It is never earlier than one full increment,
+ * because rounding to a whole minute only ever moves it later (by up to 58 s at
+ * the sub-minute steps). So the backup cannot fire inside the cycle that armed
+ * it unless one increment is itself shorter than a cycle takes, which is the
  * configuration nwScheduleHolds() refuses.
+ *
+ * **The backup therefore inherits the primary's validity and needs no condition
+ * of its own** (Andy, 2026-10-09): an increment the primary can keep, the backup
+ * can keep, because the backup is that same increment measured from the primary.
  *
  * **No backup exists at a step of a whole day**: alarm 2 carries no date, so one
  * cycle later is the same time of day and the backup would collapse onto the
@@ -147,11 +163,32 @@ inline uint32_t nwBackupWake(uint32_t next, uint32_t step) {
  * itself has failed - a wrong resistor, a dead part, a DONE pin stuck high - and
  * arming it costs 2.5 ms of bus traffic per cycle (Andy, 2026-10-09).
  */
-inline bool nwScheduleHolds(uint32_t step, uint32_t wdtSeconds, uint32_t cycleSeconds) {
+inline bool nwScheduleHolds(uint32_t step, uint32_t wdtSeconds, uint32_t cycleSeconds,
+                            uint32_t guard = NW_ALARM_GUARD_SECONDS) {
   if (!nwStepDividesDay(step)) return false;
+  if (step < guard) return false;  //The guard would push every wake: see NW_ALARM_GUARD_SECONDS
   if (step + cycleSeconds >= wdtSeconds) return false;
   if (step <= cycleSeconds) return false;
   return true;
+}
+
+/**
+ * @brief A cycle ran past its own interval, so a slot was lost.
+ * @param startSeconds the clock's time of day when the cycle began
+ * @param endSeconds the clock's time of day when it finished
+ * @param step the logging interval, in seconds
+ *
+ * @details The direct measurement, taken from the two clock reads a cycle makes
+ * anyway, rather than from an alarm flag: a flag says only whether an alarm
+ * happened to be armed inside the window, where the two times say what the
+ * schedule actually cares about. An overrun recovers by itself, because the next
+ * wake is computed from the clock and lands on the first grid point still ahead.
+ * What it must not do is pass unrecorded, so a caller that sees this flashes the
+ * LED and latches a report.
+ */
+inline bool nwCycleOverran(uint32_t startSeconds, uint32_t endSeconds, uint32_t step) {
+  uint32_t took = (endSeconds + NW_SCHEDULE_DAY - startSeconds) % NW_SCHEDULE_DAY;
+  return took >= step;
 }
 
 #endif

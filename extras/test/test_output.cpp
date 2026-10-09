@@ -117,6 +117,34 @@ static void schedule() {
   printf("daily:    an 86400 s step wakes at %lu s and has no backup: %d\n",
          (unsigned long)nwNextWake(12 * 3600, 86400),
          nwBackupWake(0, 86400) == NW_SCHEDULE_NONE);
+
+  // 5. The guard's floor and its price. A step under the guard is refused rather
+  //    than kept at the guard's cadence: at a 1 s step every wake is pushed, so
+  //    the logger would log at 2 s while the sketch asked for 1 s.
+  printf("floor:    guard %lu s; 1 s step pushed to +%lu s, held %d;  2 s step +%lu s, held %d\n",
+         (unsigned long)NW_ALARM_GUARD_SECONDS,
+         (unsigned long)nwNextWake(0, 1), nwScheduleHolds(1, 4200, 0),
+         (unsigned long)nwNextWake(0, 2), nwScheduleHolds(2, 4200, 0));
+  printf("cost:     slots pushed by the guard, over every arrival phase of a step\n");
+  for (uint8_t i = 0; i < N_STEPS; i++) {
+    uint32_t step = STEPS[i];
+    if (step > 900) continue;
+    uint32_t pushed = 0;
+    for (uint32_t phase = 0; phase < step; phase++) {
+      if (nwNextWake(phase, step) - phase > step) pushed++;
+    }
+    printf("            step %4lu s   pushed %lu of %lu phases\n",
+           (unsigned long)step, (unsigned long)pushed, (unsigned long)step);
+  }
+
+  // 6. The overrun, measured from the two clock reads a cycle makes anyway
+  //    rather than from an alarm flag.
+  printf("overran:  a 60 s step: 3 s cycle %d, 59 s %d, 60 s %d, 125 s %d; across midnight (86395 -> 10) %d\n",
+         nwCycleOverran(1000, 1003, 60), nwCycleOverran(1000, 1059, 60),
+         nwCycleOverran(1000, 1060, 60), nwCycleOverran(1000, 1125, 60),
+         nwCycleOverran(86395, 10, 60));
+  printf("overran:  across midnight, a 75 s cycle under a 60 s step (86395 -> 70): %d\n",
+         nwCycleOverran(86395, 70, 60));
 }
 
 int main() {

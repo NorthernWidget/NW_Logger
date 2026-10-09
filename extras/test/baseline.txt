@@ -26,3 +26,27 @@ holds:    3 4 5 6 10 12 15 20 30 60 120 180 240 300 360 600 720 900 1200 1800 36
 refused:  1 2 7200 10800 14400 21600 28800 43200 86400 
 refused:  a 7 s step divides nothing: 0;  a 0 s step: 0
 daily:    an 86400 s step wakes at 0 s and has no backup: 1
+floor:    guard 2 s; 1 s step pushed to +2 s, held 0;  2 s step +2 s, held 1
+cost:     slots pushed by the guard, over every arrival phase of a step
+            step    1 s   pushed 1 of 1 phases
+            step    2 s   pushed 1 of 2 phases
+            step    3 s   pushed 1 of 3 phases
+            step    4 s   pushed 1 of 4 phases
+            step    5 s   pushed 1 of 5 phases
+            step    6 s   pushed 1 of 6 phases
+            step   10 s   pushed 1 of 10 phases
+            step   12 s   pushed 1 of 12 phases
+            step   15 s   pushed 1 of 15 phases
+            step   20 s   pushed 1 of 20 phases
+            step   30 s   pushed 1 of 30 phases
+            step   60 s   pushed 1 of 60 phases
+            step  120 s   pushed 1 of 120 phases
+            step  180 s   pushed 1 of 180 phases
+            step  240 s   pushed 1 of 240 phases
+            step  300 s   pushed 1 of 300 phases
+            step  360 s   pushed 1 of 360 phases
+            step  600 s   pushed 1 of 600 phases
+            step  720 s   pushed 1 of 720 phases
+            step  900 s   pushed 1 of 900 phases
+overran:  a 60 s step: 3 s cycle 0, 59 s 0, 60 s 1, 125 s 1; across midnight (86395 -> 10) 0
+overran:  across midnight, a 75 s cycle under a 60 s step (86395 -> 70): 1
