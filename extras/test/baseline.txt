@@ -14,3 +14,15 @@ a stamp and a word                 ok=1  2026-11-07 14:05:09
 a sentence                         ok=0  (untouched: -1 -1 -1 -1 -1 -1)
 ALog: yymmddDhhmmssx               ok=0  (untouched: -1 -1 -1 -1 -1 -1)
 the null pointer                   ok=0  (untouched: -1 -1 -1 -1 -1 -1)
+
+-- the schedule --
+primary:  11600 wakes   not ahead 0   off the grid 0
+backup:   19907 backups   off the grid 0   earlier than one cycle 0   later than one minute 0   not expressible 1
+overrun:  a 900 s step armed 3 s late at 14:45:00 wakes at 54000 s;  950 s late, 54900 s
+guard:    14:59:59 with a 900 s step: guard 0 gives 54000 s, guard 2 gives 54900 s
+at :59:   a 15 s step at 23:59:45 -> backup 0 s;  a 1 s step at 23:59:59 -> backup 0 s
+backup:   a 900 s step at 15:00:00 -> 54900 s (ALog's fixed two minutes would give 54120 s)
+holds:    3 4 5 6 10 12 15 20 30 60 120 180 240 300 360 600 720 900 1200 1800 3600 
+refused:  1 2 7200 10800 14400 21600 28800 43200 86400 
+refused:  a 7 s step divides nothing: 0;  a 0 s step: 0
+daily:    an 86400 s step wakes at 0 s and has no backup: 1
