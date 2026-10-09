@@ -477,13 +477,19 @@ void NW_Logger::blinkGood() {
 // Pass in function which returns string of data
 
 void NW_Logger::run(unsigned long logInterval) {
-  _logInterval = logInterval;  //Served on Page 3
+  if (logInterval != _intervalAsked) {
+    //A new interval from the sketch: keep it, and forget any lengthening done
+    //for the old one. Nothing else resets it, so a sketch that calls run(60)
+    //every loop does not undo the lengthening each time round.
+    _intervalAsked = logInterval;
+    _logInterval = logInterval;
+  }
   // Print note that that logging has started
   // Serial.println("Log Started!"); //DEBUG!
   // Serial.println(millis()); //DEBUG!
   if (_newLog) {
     // LogEvent = true;
-    _rtc.setAlarm(logInterval);
+    _rtc.setAlarm(_logInterval);
     initLogFile();  //Start a new file each time log button is pressed
     //Add inital data point
     addDataPoint();
@@ -495,11 +501,13 @@ void NW_Logger::run(unsigned long logInterval) {
   if (_logEvent) {
     // Serial.println("Log Event!"); //DEBUG!
     // RTC.setAlarm(logInterval);  //Set/reset alarm //DEBUG!
-    addDataPoint();              //Write values to SD
-    afterLogEvent();             //A board's follow-up to the alarm-driven row (Okapi's backhaul)
-    _logEvent = false;           //Clear log flag
-    _rtc.setAlarm(logInterval);  //Set/reset alarm
-    resetWDT();                  //Clear alarm
+    uint32_t began = millis();    //The cycle starts here: see keepInterval()
+    addDataPoint();               //Write values to SD
+    afterLogEvent();              //A board's follow-up to the alarm-driven row (Okapi's backhaul)
+    _logEvent = false;            //Clear log flag
+    keepInterval(began);          //Measure the cycle; lengthen the interval if it no longer fits
+    _rtc.setAlarm(_logInterval);  //Set/reset alarm, at the interval actually kept
+    resetWDT();                   //Clear alarm
   }
 
   // Write data to SD card without interrupting existing timing cycle
@@ -521,7 +529,7 @@ void NW_Logger::run(unsigned long logInterval) {
 
   if (!digitalRead(RTCInt)) {       //Catch alarm if not reset properly
     Serial.println("Reset Alarm");  //DEBUG!
-    _rtc.setAlarm(logInterval);     //Turn alarm back on
+    _rtc.setAlarm(_logInterval);    //Turn alarm back on
   }
 
   _awakeCount++;
@@ -534,6 +542,65 @@ void NW_Logger::run(unsigned long logInterval) {
     sleepNow();
   }
   delay(1);
+}
+
+uint32_t NW_Logger::cycleSeconds() {
+  //Rounded up: a cycle of 1200 ms needs an interval longer than 2 s, not 1.
+  return (_cycleMillisMax + 999UL) / 1000UL;
+}
+
+uint32_t NW_Logger::intervalKept() {
+  return _logInterval;
+}
+
+void NW_Logger::keepInterval(uint32_t beganMillis) {
+  //The cycle the schedule has to accommodate: everything between waking and
+  //arming the next alarm. millis() wraps after 49 days and the subtraction is
+  //correct across the wrap, because both are unsigned.
+  uint32_t took = millis() - beganMillis;
+  if (took > _cycleMillisMax) _cycleMillisMax = took;
+
+  //Did this cycle run past its own interval? A lost slot recovers by itself,
+  //because the next alarm is set from the clock; what it must not do is pass
+  //unrecorded.
+  if (took / 1000UL >= _logInterval) {
+    _pages.latchNotice(NW_LOGGER_CYCLE_OVERRAN);
+    signal(NW_LOGGER_CYCLE_OVERRAN);
+  }
+
+  //Lengthen from what the sketch asked for, never from the interval in use, so
+  //the result is a function of the longest cycle seen and does not ratchet
+  //through its own history.
+  uint32_t kept = nwLengthenStep(_intervalAsked, cycleSeconds(), wdtSeconds);
+  if (kept == NW_SCHEDULE_NONE) {
+    //No interval holds this cycle inside the watchdog: the board resets
+    //mid-cycle whatever the schedule, and no interval fixes it.
+    _pages.latchFault(NW_LOGGER_NO_SCHEDULE);
+    signal(NW_LOGGER_NO_SCHEDULE);
+    return;
+  }
+  if (kept == _logInterval) return;
+
+  _logInterval = kept;
+  Serial.print(F("Interval lengthened to "));
+  Serial.print(kept);
+  Serial.print(F(" s; a cycle took "));
+  Serial.print(took);
+  Serial.println(F(" ms"));
+  _pages.latchNotice(NW_LOGGER_INTERVAL_LENGTHENED);
+  signal(NW_LOGGER_INTERVAL_LENGTHENED);
+}
+
+void NW_Logger::signal(uint8_t code) {
+  //The default rendering, on the one RGB LED both boards carry. A board with
+  //more to show it with overrides this; the code it is given is the same.
+  unsigned long color = (code == NW_LOGGER_NO_SCHEDULE) ? RED : CYAN;
+  for (int i = 0; i < 10; i++) {
+    LED_Color(color);
+    delay(100);
+    LED_Color(OFF);
+    delay(100);
+  }
 }
 
 // Send a pulse to "feed" the watchdog timer

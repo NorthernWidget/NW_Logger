@@ -20,6 +20,7 @@ Andy Wickert
 #include <EEPROM.h>
 #include <NW_Core.h>       // NW_Sensor: the view the status file takes of a sensor; NW_Pages: the logger's own pages
 #include "NW_TimeStamp.h"  // the twelve-digit stamp the clock is set from
+#include "NW_Schedule.h"   // when the logger wakes, and the interval it can keep
 #include "DS3231_Logger.h"
 #include "SdFat.h"
 #include <NW_BME280.h>
@@ -45,6 +46,20 @@ Andy Wickert
 #define PURPLE 0xFF800080L
 #define CYAN 0xFF00FFFFL
 #define BLACK_ALERT 0x802019FFL  ///< Deep blue-violet; used internally for error states.
+/// @}
+
+/// @defgroup messages Logger message codes
+/// What a logger has to tell the user, apart from how a board tells it. Passed to
+/// signal(), which each board renders on the LEDs it has, and latched into the
+/// Note column as a report so the LED and the file say the same thing. The
+/// numbers are the device-specific range of NW-Device-Specification's report
+/// kinds (16-31), where the universal kinds 0-10 cover faults every device can
+/// have. **Provisional: the three values are proposals awaiting Andy.**
+/// @{
+#define NW_LOGGER_INTERVAL_LENGTHENED 16  ///< A cycle outgrew its interval; run() is keeping a longer one
+#define NW_LOGGER_CYCLE_OVERRAN 17        ///< A cycle ran past its own interval and a slot was lost
+#define NW_LOGGER_BACKUP_WOKE 18          ///< Alarm 2 woke the logger, so the primary alarm was missed
+#define NW_LOGGER_NO_SCHEDULE 19          ///< No interval can hold this cycle inside the watchdog: the board cannot log
 /// @}
 
 #define ON 1
@@ -279,6 +294,36 @@ public:
   void run(unsigned long logInterval);
 
   /**
+     * @brief The longest logging cycle seen since boot, in whole seconds, rounded up.
+     * @details Measured across addDataPoint() and afterLogEvent() - everything
+     * between waking and arming the next alarm - so it is the quantity the
+     * schedule has to accommodate. Rounded up, because a cycle of 1.2 s needs an
+     * interval longer than 2 s. Zero until the first row is written.
+     */
+  uint32_t cycleSeconds();
+
+  /**
+     * @brief The interval run() is actually keeping, which is not always the one it was given.
+     * @details Equal to the sketch's interval whenever that interval holds. Where
+     * a cycle has outgrown it, run() lengthens it to the next interval the grid
+     * can hold, writes a notice into the Note column and signals the board
+     * (NW_LOGGER_INTERVAL_LENGTHENED): a logger that cannot keep the schedule it
+     * was given says so rather than silently dropping every other row.
+     */
+  uint32_t intervalKept();
+
+  /**
+     * @brief The watchdog's period in seconds, or 0 when it is not known.
+     * @details Margay and Okapi both carry a TPL5010 whose period is set by a
+     * 100k resistor on its DELAY pin, and that period has not been read off the
+     * datasheet's curve. While it is 0 the schedule is checked against everything
+     * but the watchdog, because a bound nobody has measured must not refuse an
+     * interval that works: assume it too short and an hourly logger is refused,
+     * too long and the board resets mid-cycle. Set it once the number is known.
+     */
+  uint32_t wdtSeconds = 0;
+
+  /**
      * @brief Log one data point immediately, outside the normal run() cycle.
      * @details The board's library implements this: it switches the I2C bus
      * to external, calls the user's update() function, restores the bus,
@@ -379,6 +424,18 @@ protected:
   virtual void sleepNow() = 0;     ///< Power down between events and come back with the card ready.
   virtual void afterLogEvent() {}  ///< Called by run() after an alarm-driven row is written (Okapi: the backhaul).
 
+  /**
+     * @brief Show the user one message, in whatever the board has to show it with.
+     * @details The seam between what a logger has to say and how a board says it.
+     * NW_Logger decides the message; Margay renders it on the one RGB LED and
+     * Okapi, which has several, can render the same code more legibly. The
+     * default is the RGB pattern both boards carry today. The codes are the
+     * report kinds of NW-Device-Specification, so the LED, the Note column and
+     * the serial line all speak one vocabulary.
+     * @param code an NW_LOGGER_* message code
+     */
+  virtual void signal(uint8_t code);
+
   // --- begin() in pieces: a board's begin() calls these in order around its own steps ---
   void acceptAddresses(uint8_t* vals, uint8_t numVals);  ///< The watched sensors' addresses, truncated to 128
   bool readIdentity();                                   ///< Pages 0-1 from EEPROM; _sn and _hwVersion from Page 0 (Schema 1) or the last 8 bytes (Schema 0). Returns whether Page 0 is valid; latches Page0Invalid if not
@@ -388,6 +445,9 @@ protected:
   void attachExtInt();                                   ///< The external-interrupt counter, if setExtInt() named a pin
 
   void blinkGood();
+  /// @brief Measure the cycle that began at beganMillis and keep an interval that holds it.
+  void keepInterval(uint32_t beganMillis);
+
   virtual void writeDataToSD();
   virtual void buttonLog();
   static void isr0();
@@ -443,7 +503,9 @@ protected:
   bool _sdTestFailed = false;                   // the boot write-and-read-back on the card failed
   bool _clockError = false;                     // the DS3231 did not answer, or its oscillator is stopped
   bool _bmeError = false;                       // the BME280 did not answer
-  unsigned long _logInterval = 0;               // seconds, from run(); served on Page 3
+  unsigned long _logInterval = 0;               // seconds, the interval kept; served on Page 3
+  unsigned long _intervalAsked = 0;             // seconds, what the sketch passed to run()
+  uint32_t _cycleMillisMax = 0;                 // the longest cycle seen, measured across addDataPoint()
   uint16_t _fileNum = 0;                        // the number of the current log and status file pair
   NW_Sensor* _sensors[MAX_SENSORS];             // sensors whose reports go to the status file (watch())
   uint8_t _sensorAddress[MAX_SENSORS] = { 0 };  // where each one is, from watch()

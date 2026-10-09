@@ -148,15 +148,25 @@ inline uint32_t nwBackupWake(uint32_t next, uint32_t step) {
 /**
  * @brief A step this board can actually keep.
  * @param step the logging interval, in seconds
- * @param wdtSeconds the watchdog's period, from the hardware (Margay: a 100k resistor on the TPL5010's DELAY pin)
- * @param cycleSeconds how long a logging cycle takes, measured on the bench
+ * @param wdtSeconds the watchdog's period, from the hardware (Margay: a 100k resistor on the TPL5010's DELAY pin); **0 when there is no watchdog or its period is not known**
+ * @param cycleSeconds how long a logging cycle takes, measured by the logger
+ * @param guard the arming lead, NW_ALARM_GUARD_SECONDS unless measured otherwise
  * @return true when the schedule holds
  *
- * @details Three conditions, and the backup is not one of them. (1) The step
- * divides the day. (2) The step, plus a cycle, stays inside the watchdog period:
- * the watchdog is fed once per wake, so an interval longer than its period resets
- * the board instead of logging. (3) The step exceeds a cycle, or the next wake
+ * @details Four conditions, and the backup is not one of them. (1) The step
+ * divides the day. (2) The step is at least the guard, or every wake would be
+ * pushed. (3) The step, plus a cycle, stays inside the watchdog period: the
+ * watchdog is fed once per wake, so an interval longer than its period resets the
+ * board instead of logging. (4) The step exceeds a cycle, or the next wake
  * arrives while this one is still running.
+ *
+ * **A watchdog period of 0 means the condition is not applied**, because a bound
+ * nobody has measured must not refuse a schedule that works. Margay and Okapi
+ * both carry a TPL5010 whose period is set by a 100k resistor, and that period
+ * has not been read off the datasheet's curve: assume it too short and an hourly
+ * logger is refused for no reason, too long and the board resets mid-cycle. So
+ * the number is the board's to supply once measured, and until then only the
+ * other three conditions apply.
  *
  * The backup is armed whatever the watchdog does. Where the watchdog would fire
  * first, the backup sits behind it as the only recovery left if the watchdog
@@ -167,9 +177,73 @@ inline bool nwScheduleHolds(uint32_t step, uint32_t wdtSeconds, uint32_t cycleSe
                             uint32_t guard = NW_ALARM_GUARD_SECONDS) {
   if (!nwStepDividesDay(step)) return false;
   if (step < guard) return false;  //The guard would push every wake: see NW_ALARM_GUARD_SECONDS
-  if (step + cycleSeconds >= wdtSeconds) return false;
+  if (wdtSeconds && step + cycleSeconds >= wdtSeconds) return false;
   if (step <= cycleSeconds) return false;
   return true;
+}
+
+/**
+ * @brief The next interval the grid can hold, after the one given.
+ * @param after return the smallest legible step strictly greater than this
+ * @return the step, or NW_SCHEDULE_NONE when nothing larger is legible
+ *
+ * @details The legible set is generated rather than tabulated, so it costs no
+ * RAM on a board that has 16 kB of it: the divisors of 60 as seconds, sixty
+ * times the divisors of 60 as minutes dividing an hour, and 3600 times the
+ * divisors of 24 as hours dividing a day. Those are the same thirty values the
+ * harness sweeps, and every one of them divides the day.
+ */
+inline uint32_t nwNextLegibleStep(uint32_t after) {
+  uint32_t best = NW_SCHEDULE_NONE;
+  for (uint32_t s = 1; s <= 60; s++) {
+    if (60 % s) continue;
+    if (s > after && s < best) best = s;  //Seconds: the divisors of 60
+    uint32_t m = s * 60;
+    if (m > after && m < best) best = m;  //Minutes: the same divisors, as minutes
+  }
+  for (uint32_t h = 1; h <= 24; h++) {
+    if (24 % h) continue;
+    uint32_t v = h * 3600;
+    if (v > after && v < best) best = v;  //Hours: the divisors of 24
+  }
+  return best;
+}
+
+/**
+ * @brief The interval this board can actually keep, lengthening the one asked for if it must.
+ * @param step the interval the sketch asked for, in seconds
+ * @param cycleSeconds the longest logging cycle seen so far, in whole seconds
+ * @param wdtSeconds the watchdog's period, from the hardware
+ * @param guard the arming lead, NW_ALARM_GUARD_SECONDS unless measured otherwise
+ * @return the interval to keep: `step` when it holds, a longer legible step when
+ * it does not, or NW_SCHEDULE_NONE when no interval can hold this cycle
+ *
+ * @details Returns `step` untouched whenever the schedule holds, so the normal
+ * path costs one comparison. Where a cycle has outgrown its interval the logger
+ * takes the next legible step that holds rather than a multiple of the one asked
+ * for, because a multiple need not divide the day (20 s doubles to 40 s, which
+ * does not) and the grid is what keeps rows on round times.
+ *
+ * **It never shortens.** The interval is sized to the longest cycle seen and not
+ * to the last one, because an interval that cannot hold the worst cycle will
+ * overrun again; a single slow card write therefore lengthens the schedule for
+ * the rest of the deployment. That is the conservative direction, and the
+ * alternative - lengthening only after several consecutive overruns - is a
+ * threshold for Andy rather than one to pick here.
+ *
+ * NW_SCHEDULE_NONE means the hardware cannot log at all: the cycle plus any
+ * interval exceeds the watchdog, so the board would reset mid-cycle whatever the
+ * schedule. No interval fixes that and the caller must say so loudly.
+ */
+inline uint32_t nwLengthenStep(uint32_t step, uint32_t cycleSeconds, uint32_t wdtSeconds,
+                               uint32_t guard = NW_ALARM_GUARD_SECONDS) {
+  if (nwScheduleHolds(step, wdtSeconds, cycleSeconds, guard)) return step;
+  uint32_t next = step;
+  while (true) {
+    next = nwNextLegibleStep(next);
+    if (next == NW_SCHEDULE_NONE) return NW_SCHEDULE_NONE;
+    if (nwScheduleHolds(next, wdtSeconds, cycleSeconds, guard)) return next;
+  }
 }
 
 /**
