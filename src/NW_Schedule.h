@@ -1,0 +1,157 @@
+/*
+NW_Schedule: when a logger wakes, and when its backup wakes.
+Licensed: GNU GPL v3
+
+The arithmetic of an absolute, drift-free logging schedule, kept apart from the
+clock and the alarm registers because it is the only part with anything to get
+wrong: extras/test exercises every step and every overrun, where arming an alarm
+needs a board. See NW-Status/QUEUE.md, "the alarm must be absolute".
+
+A wake is computed from the clock and snapped to the schedule. Computing it from
+the clock is what keeps it in the future, so the logger cannot deadlock; snapping
+it to the schedule is what keeps it from drifting, so rows land on round times
+however long a cycle takes. Taking only one of the two gives the two schemes this
+replaces: `now + interval` is always ahead and always wandering, and
+`previous + interval` holds the grid and can land in the past.
+*/
+
+#ifndef NW_Schedule_h
+#define NW_Schedule_h
+
+#include <stdint.h>
+
+/// Seconds in a day: every schedule is a time of day, because an alarm carries no month.
+#define NW_SCHEDULE_DAY 86400UL
+
+/// Returned by nwBackupWake() when no backup can be expressed.
+#define NW_SCHEDULE_NONE 0xFFFFFFFFUL
+
+/**
+ * @brief The seconds of lead a wake needs, so the alarm is armed before its instant passes.
+ *
+ * @details **Derived, not chosen.** The guard must cover everything that can
+ * elapse between the clock read that produced the wake and the moment alarm 1 is
+ * live in the clock's comparator. An alarm whose instant has already gone by does
+ * not fire: with the hour-minute-second mask it waits a day, and with the date
+ * mask a month. Four terms, at the DS3231 library's own traffic and Wire's
+ * default 100 kHz (no setClock() anywhere in the logger path):
+ *
+ * 1. **Read quantisation: 1000 ms.** The seconds register counts whole seconds,
+ *    so a read of 15:00:00 means the true time lies anywhere in
+ *    [15:00:00.000, 15:00:01.000). This term dominates the other three by two
+ *    orders of magnitude, and nothing short of reading the 32 kHz output removes
+ *    it.
+ * 2. **Arming traffic: 3.6 ms** to get alarm 1 live, 6.1 ms for both alarms.
+ *    Counted at 90 us per byte (8 bits and an acknowledge at 10 us a bit) and
+ *    10 us per start or stop: readTime() 0.94 ms (two transactions, 2 bytes then
+ *    8), turnOffAlarm() 0.69 ms (a control read at 0.40 and a write at 0.29),
+ *    setA1Time() 0.56 ms (a pointer and four alarm bytes), checkIfAlarm() 0.69 ms,
+ *    turnOnAlarm() 0.69 ms. Alarm 2 adds 2.54 ms, after alarm 1 is already live.
+ * 3. **Delays in the arming path: 10 ms budgeted.** ALog carries delay(2) after
+ *    setA1Time and delay(1) after each turnOnAlarm, 6 ms in all. Nothing else
+ *    belongs between the clock read and the arming: no card access, no sensor.
+ * 4. **Interrupt service: 1 ms budgeted.** The tipping-bucket counter and the
+ *    pin-change handler can preempt the sequence by a few microseconds each.
+ *
+ * 1000 + 4 + 10 + 1 = 1015 ms, and the alarm's own resolution is one second, so
+ * the guard rounds up to **2 s**. One second is not enough: the quantisation
+ * alone consumes it and leaves nothing for the traffic. Raise this if the arming
+ * path ever grows; correctness does not rest on the number, because the caller
+ * reads the clock back after arming and re-arms if the instant passed anyway.
+ */
+#define NW_ALARM_GUARD_SECONDS 2UL
+
+/**
+ * @brief A step the schedule can hold: it must divide the day evenly.
+ * @details Otherwise the last slot before midnight is short and the grid breaks
+ * at the day boundary. The legible set is the divisors of 60 applied to seconds
+ * (1, 2, 3, 4, 5, 6, 10, 12, 15, 20, 30), the minutes dividing an hour applied
+ * to minutes, and the hours dividing a day.
+ */
+inline bool nwStepDividesDay(uint32_t step) {
+  if (step == 0) return false;
+  if (step > NW_SCHEDULE_DAY) return false;
+  return NW_SCHEDULE_DAY % step == 0;
+}
+
+/**
+ * @brief The next wake: the first grid point after now, with the guard's lead.
+ * @param secondsIntoDay the clock's time of day, in seconds
+ * @param step the logging interval, in seconds; must divide the day
+ * @param guard the lead a wake needs, NW_ALARM_GUARD_SECONDS unless measured otherwise
+ * @return the wake's time of day, or NW_SCHEDULE_NONE for a step the schedule cannot hold
+ *
+ * @details Always strictly ahead of secondsIntoDay, because integer division
+ * floors: ((s / step) + 1) * step > s for every s. Always a multiple of step
+ * past midnight, so it does not depend on when the last cycle ended. A cycle
+ * that overruns loses its slot and resumes on the grid rather than pushing every
+ * later wake sideways.
+ *
+ * At a step of a whole day the grid holds one point, so the result is that point
+ * and the difference from now is a date rather than a time of day. The alarm
+ * still fires correctly, because the hour-minute-second mask repeats daily.
+ */
+inline uint32_t nwNextWake(uint32_t secondsIntoDay, uint32_t step, uint32_t guard = NW_ALARM_GUARD_SECONDS) {
+  if (!nwStepDividesDay(step)) return NW_SCHEDULE_NONE;
+  uint32_t s = secondsIntoDay % NW_SCHEDULE_DAY;
+  uint32_t next = ((s / step) + 1) * step;
+  if (next - s < guard) next += step;  //Too close to arm: take the following slot
+  return next % NW_SCHEDULE_DAY;
+}
+
+/**
+ * @brief The backup wake: one cycle after the primary, on a whole minute.
+ * @param next the primary wake, from nwNextWake()
+ * @param step the logging interval, in seconds
+ * @return the backup's time of day, or NW_SCHEDULE_NONE when none can be expressed
+ *
+ * @details Alarm 2 carries hours and minutes only and matches at seconds = 00, so
+ * it can be placed on a whole minute and nowhere else. For every step the
+ * schedule can hold, a whole minute is itself a grid point, which is what lets
+ * the backup land on the grid: a rescued row is then indistinguishable from an
+ * ordinary one, and a lost interrupt costs exactly one row.
+ *
+ * The result is never earlier than one full cycle after the primary, because
+ * rounding to a whole minute only ever moves it later (by up to 58 s at the
+ * sub-minute steps). So the backup cannot fire inside the cycle that armed it
+ * unless one cycle is itself shorter than a cycle takes, which is the
+ * configuration nwScheduleHolds() refuses.
+ *
+ * **No backup exists at a step of a whole day**: alarm 2 carries no date, so one
+ * cycle later is the same time of day and the backup would collapse onto the
+ * primary.
+ */
+inline uint32_t nwBackupWake(uint32_t next, uint32_t step) {
+  if (!nwStepDividesDay(step)) return NW_SCHEDULE_NONE;
+  if (step >= NW_SCHEDULE_DAY) return NW_SCHEDULE_NONE;
+  uint32_t backup = next + step;
+  if (backup % 60) backup = ((backup / 60) + 1) * 60;  //A sub-minute step: the next whole minute
+  return backup % NW_SCHEDULE_DAY;
+}
+
+/**
+ * @brief A step this board can actually keep.
+ * @param step the logging interval, in seconds
+ * @param wdtSeconds the watchdog's period, from the hardware (Margay: a 100k resistor on the TPL5010's DELAY pin)
+ * @param cycleSeconds how long a logging cycle takes, measured on the bench
+ * @return true when the schedule holds
+ *
+ * @details Three conditions, and the backup is not one of them. (1) The step
+ * divides the day. (2) The step, plus a cycle, stays inside the watchdog period:
+ * the watchdog is fed once per wake, so an interval longer than its period resets
+ * the board instead of logging. (3) The step exceeds a cycle, or the next wake
+ * arrives while this one is still running.
+ *
+ * The backup is armed whatever the watchdog does. Where the watchdog would fire
+ * first, the backup sits behind it as the only recovery left if the watchdog
+ * itself has failed - a wrong resistor, a dead part, a DONE pin stuck high - and
+ * arming it costs 2.5 ms of bus traffic per cycle (Andy, 2026-10-09).
+ */
+inline bool nwScheduleHolds(uint32_t step, uint32_t wdtSeconds, uint32_t cycleSeconds) {
+  if (!nwStepDividesDay(step)) return false;
+  if (step + cycleSeconds >= wdtSeconds) return false;
+  if (step <= cycleSeconds) return false;
+  return true;
+}
+
+#endif
