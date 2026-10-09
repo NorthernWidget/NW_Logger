@@ -194,16 +194,18 @@ inline bool nwScheduleHolds(uint32_t step, uint32_t wdtSeconds, uint32_t cycleSe
  * harness sweeps, and every one of them divides the day.
  */
 inline uint32_t nwNextLegibleStep(uint32_t after) {
+  //The divisor tests are deliberately 8-bit: at uint32_t each one calls the
+  //32-bit modulo routine, and there are 84 of them.
   uint32_t best = NW_SCHEDULE_NONE;
-  for (uint32_t s = 1; s <= 60; s++) {
+  for (uint8_t s = 1; s <= 60; s++) {
     if (60 % s) continue;
     if (s > after && s < best) best = s;  //Seconds: the divisors of 60
-    uint32_t m = s * 60;
+    uint32_t m = (uint32_t)s * 60;
     if (m > after && m < best) best = m;  //Minutes: the same divisors, as minutes
   }
-  for (uint32_t h = 1; h <= 24; h++) {
+  for (uint8_t h = 1; h <= 24; h++) {
     if (24 % h) continue;
-    uint32_t v = h * 3600;
+    uint32_t v = (uint32_t)h * 3600;
     if (v > after && v < best) best = v;  //Hours: the divisors of 24
   }
   return best;

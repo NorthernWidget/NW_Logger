@@ -145,6 +145,34 @@ static void schedule() {
          nwCycleOverran(86395, 10, 60));
   printf("overran:  across midnight, a 75 s cycle under a 60 s step (86395 -> 70): %d\n",
          nwCycleOverran(86395, 70, 60));
+
+  // 7. The interval the logger keeps when a cycle has outgrown the one it was
+  //    given. The step generator is checked against the table it must reproduce,
+  //    then the lengthening is walked over a range of cycle durations.
+  printf("legible:  ");
+  uint32_t walk = 0;
+  uint8_t seen = 0;
+  while (true) {
+    walk = nwNextLegibleStep(walk);
+    if (walk == NW_SCHEDULE_NONE) break;
+    printf("%lu ", (unsigned long)walk);
+    if (seen < N_STEPS && walk != STEPS[seen]) printf("(EXPECTED %lu) ", (unsigned long)STEPS[seen]);
+    seen++;
+  }
+  printf("\n          generated %d of %d tabulated steps, in order\n", seen, N_STEPS);
+
+  printf("lengthen: a 10 s interval, no watchdog declared\n");
+  const uint32_t CYCLES[] = { 0, 1, 2, 9, 10, 11, 25, 31, 59, 61, 3599 };
+  for (uint8_t i = 0; i < sizeof(CYCLES) / sizeof(CYCLES[0]); i++) {
+    printf("            cycle %4lu s -> keeps %lu s\n", (unsigned long)CYCLES[i],
+           (unsigned long)nwLengthenStep(10, CYCLES[i], 0));
+  }
+  printf("lengthen: the watchdog's ceiling, at 4200 s\n");
+  printf("            a 900 s interval with a 2 s cycle   -> %lu s\n", (unsigned long)nwLengthenStep(900, 2, 4200));
+  printf("            a 900 s interval with a 1000 s cycle -> %lu s\n", (unsigned long)nwLengthenStep(900, 1000, 4200));
+  printf("            a 900 s interval with a 5000 s cycle -> none: %d\n",
+         nwLengthenStep(900, 5000, 4200) == NW_SCHEDULE_NONE);
+  printf("            the same 5000 s cycle, no watchdog   -> %lu s\n", (unsigned long)nwLengthenStep(900, 5000, 0));
 }
 
 int main() {

@@ -50,3 +50,22 @@ cost:     slots pushed by the guard, over every arrival phase of a step
             step  900 s   pushed 1 of 900 phases
 overran:  a 60 s step: 3 s cycle 0, 59 s 0, 60 s 1, 125 s 1; across midnight (86395 -> 10) 0
 overran:  across midnight, a 75 s cycle under a 60 s step (86395 -> 70): 1
+legible:  1 2 3 4 5 6 10 12 15 20 30 60 120 180 240 300 360 600 720 900 1200 1800 3600 7200 10800 14400 21600 28800 43200 86400 
+          generated 30 of 30 tabulated steps, in order
+lengthen: a 10 s interval, no watchdog declared
+            cycle    0 s -> keeps 10 s
+            cycle    1 s -> keeps 10 s
+            cycle    2 s -> keeps 10 s
+            cycle    9 s -> keeps 10 s
+            cycle   10 s -> keeps 12 s
+            cycle   11 s -> keeps 12 s
+            cycle   25 s -> keeps 30 s
+            cycle   31 s -> keeps 60 s
+            cycle   59 s -> keeps 60 s
+            cycle   61 s -> keeps 120 s
+            cycle 3599 s -> keeps 3600 s
+lengthen: the watchdog's ceiling, at 4200 s
+            a 900 s interval with a 2 s cycle   -> 900 s
+            a 900 s interval with a 1000 s cycle -> 1200 s
+            a 900 s interval with a 5000 s cycle -> none: 1
+            the same 5000 s cycle, no watchdog   -> 7200 s
