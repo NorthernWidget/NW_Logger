@@ -21,6 +21,7 @@ Andy Wickert
 #include <NW_Core.h>       // NW_Sensor: the view the status file takes of a sensor; NW_Pages: the logger's own pages
 #include "NW_TimeStamp.h"  // the twelve-digit stamp the clock is set from
 #include "NW_Schedule.h"   // when the logger wakes, and the interval it can keep
+#include "NW_Message.h"    // what the logger says about itself, and how bad it is
 #include "DS3231_Logger.h"
 #include "SdFat.h"
 #include <NW_BME280.h>
@@ -46,20 +47,6 @@ Andy Wickert
 #define PURPLE 0xFF800080L
 #define CYAN 0xFF00FFFFL
 #define BLACK_ALERT 0x802019FFL  ///< Deep blue-violet; used internally for error states.
-/// @}
-
-/// @defgroup messages Logger message codes
-/// What a logger has to tell the user, apart from how a board tells it. Passed to
-/// signal(), which each board renders on the LEDs it has, and latched into the
-/// Note column as a report so the LED and the file say the same thing. The
-/// numbers are the device-specific range of NW-Device-Specification's report
-/// kinds (16-31), where the universal kinds 0-10 cover faults every device can
-/// have. **Provisional: the three values are proposals awaiting Andy.**
-/// @{
-#define NW_LOGGER_INTERVAL_LENGTHENED 16  ///< A cycle outgrew its interval; run() is keeping a longer one
-#define NW_LOGGER_CYCLE_OVERRAN 17        ///< A cycle ran past its own interval and a slot was lost
-#define NW_LOGGER_BACKUP_WOKE 18          ///< Alarm 2 woke the logger, so the primary alarm was missed
-#define NW_LOGGER_NO_SCHEDULE 19          ///< No interval can hold this cycle inside the watchdog: the board cannot log
 /// @}
 
 #define ON 1
@@ -427,14 +414,38 @@ protected:
   /**
      * @brief Show the user one message, in whatever the board has to show it with.
      * @details The seam between what a logger has to say and how a board says it.
-     * NW_Logger decides the message; Margay renders it on the one RGB LED and
-     * Okapi, which has several, can render the same code more legibly. The
-     * default is the RGB pattern both boards carry today. The codes are the
-     * report kinds of NW-Device-Specification, so the LED, the Note column and
-     * the serial line all speak one vocabulary.
-     * @param code an NW_LOGGER_* message code
+     * NW_Logger decides the message; this default renders it on the single RGB
+     * LED both boards carry, and a board with more to show it with overrides it.
+     * Severity rides on the flicker rate and identity on the rhythm, so the
+     * patterns are told apart without counting and without colour - which also
+     * carries them for a user who cannot separate red from green.
+     *
+     * Three of the five patterns are ALog's, with its reasoning: LEDgood()'s
+     * long-short-short for all-well, LEDwarn()'s fast flutter for a card that
+     * did not come up, and LEDtimeWrong()'s syncopation for a clock that has
+     * reset - where the broken rhythm is the message and there is nothing to
+     * memorise.
+     *
+     * A message with no pattern shows nothing, which is most of them: an
+     * interval change at three in the morning has no observer, so the field
+     * messages go to the Note column alone.
+     * @param message an NW_MSG_* value
      */
-  virtual void signal(uint8_t code);
+  virtual void signal(uint8_t message);
+
+  /**
+     * @brief Record a message: into the Note column, onto the serial line, and into this cycle's set.
+     * @details The set is what the boot verdict renders and what the next row's
+     * Note column carries. It does not flash: the LED speaks at deployment, through
+     * showVerdict().
+     */
+  void raise(uint8_t message);
+
+  /// @brief The raised message of the highest band, or NW_MSG_READY when nothing is wrong.
+  uint8_t worstMessage();
+
+  /// @brief Show the band of the worst message raised so far: the boot verdict.
+  void showVerdict();
 
   // --- begin() in pieces: a board's begin() calls these in order around its own steps ---
   void acceptAddresses(uint8_t* vals, uint8_t numVals);  ///< The watched sensors' addresses, truncated to 128
@@ -506,6 +517,7 @@ protected:
   unsigned long _logInterval = 0;               // seconds, the interval kept; served on Page 3
   unsigned long _intervalAsked = 0;             // seconds, what the sketch passed to run()
   uint32_t _cycleMillisMax = 0;                 // the longest cycle seen, measured across addDataPoint()
+  uint16_t _messages = 0;                       // one bit per NW_MSG_*: what this logger has said about itself
   uint16_t _fileNum = 0;                        // the number of the current log and status file pair
   NW_Sensor* _sensors[MAX_SENSORS];             // sensors whose reports go to the status file (watch())
   uint8_t _sensorAddress[MAX_SENSORS] = { 0 };  // where each one is, from watch()

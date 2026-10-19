@@ -564,8 +564,7 @@ void NW_Logger::keepInterval(uint32_t beganMillis) {
   //because the next alarm is set from the clock; what it must not do is pass
   //unrecorded.
   if (took / 1000UL >= _logInterval) {
-    _pages.latchNotice(NW_LOGGER_CYCLE_OVERRAN);
-    signal(NW_LOGGER_CYCLE_OVERRAN);
+    raise(NW_MSG_CYCLE_OVERRAN);
   }
 
   //Lengthen from what the sketch asked for, never from the interval in use, so
@@ -575,8 +574,7 @@ void NW_Logger::keepInterval(uint32_t beganMillis) {
   if (kept == NW_SCHEDULE_NONE) {
     //No interval holds this cycle inside the watchdog: the board resets
     //mid-cycle whatever the schedule, and no interval fixes it.
-    _pages.latchFault(NW_LOGGER_NO_SCHEDULE);
-    signal(NW_LOGGER_NO_SCHEDULE);
+    raise(NW_MSG_NO_SCHEDULE);
     return;
   }
   if (kept == _logInterval) return;
@@ -587,19 +585,127 @@ void NW_Logger::keepInterval(uint32_t beganMillis) {
   Serial.print(F(" s; a cycle took "));
   Serial.print(took);
   Serial.println(F(" ms"));
-  _pages.latchNotice(NW_LOGGER_INTERVAL_LENGTHENED);
-  signal(NW_LOGGER_INTERVAL_LENGTHENED);
+  raise(NW_MSG_INTERVAL_LENGTHENED);
 }
 
-void NW_Logger::signal(uint8_t code) {
-  //The default rendering, on the one RGB LED both boards carry. A board with
-  //more to show it with overrides this; the code it is given is the same.
-  unsigned long color = (code == NW_LOGGER_NO_SCHEDULE) ? RED : CYAN;
-  for (int i = 0; i < 10; i++) {
-    LED_Color(color);
-    delay(100);
-    LED_Color(OFF);
-    delay(100);
+void NW_Logger::raise(uint8_t message) {
+  if (message >= NW_MSG_COUNT) return;
+  _messages |= (uint16_t)1 << message;
+  NW_BufferPrint p(_note, NOTE_CAPACITY, true);  //append to this row's notes
+  if (p.length() > 0) p.print(';');
+  p.print(nwMessageWord(message));
+  if (p.truncated()) raise(NW_MSG_NOTE_TRUNCATED);
+  Serial.print(F("Note: "));
+  Serial.println(nwMessageWord(message));
+}
+
+uint8_t NW_Logger::worstMessage() {
+  //The highest band raised; within a band the first, which is the list's own
+  //order. A band of FINE answers READY, so a clean boot gets the chirp rather
+  //than whichever housekeeping message happened to be raised.
+  uint8_t worst = NW_MSG_READY;
+  uint8_t band = NW_BAND_FINE;
+  for (uint8_t m = 0; m < NW_MSG_COUNT; m++) {
+    if (!(_messages & ((uint16_t)1 << m))) continue;
+    if (nwMessageBand(m) > band) {
+      band = nwMessageBand(m);
+      worst = m;
+    }
+  }
+  return band == NW_BAND_FINE ? NW_MSG_READY : worst;
+}
+
+void NW_Logger::showVerdict() {
+  signal(worstMessage());
+}
+
+//The five patterns, each inside the same three-second window, so the user is
+//told once how long to look: watch the status LED for three seconds after the
+//aux light goes out.
+static const uint16_t NW_SIGNAL_WINDOW_MS = 3000;
+
+void NW_Logger::signal(uint8_t message) {
+  switch (message) {
+    case NW_MSG_READY:
+      {
+        //ALog's LEDgood(), long-short-short. Its own length, not the window's.
+        LED_Color(BLUE);
+        delay(1000);
+        LED_Color(OFF);
+        delay(300);
+        LED_Color(BLUE);
+        delay(100);
+        LED_Color(OFF);
+        delay(100);
+        LED_Color(BLUE);
+        delay(100);
+        LED_Color(OFF);
+        return;
+      }
+    case NW_MSG_CARD_MISSING:
+    case NW_MSG_CARD_WRITE_FAILED:
+      {
+        //ALog's LEDwarn(), a fast even flutter: nothing is being recorded. One
+        //pattern for both messages, because the user does the same thing about
+        //either - reseat or replace the card - and the file says which it was.
+        for (uint16_t t = 0; t < NW_SIGNAL_WINDOW_MS; t += 120) {
+          LED_Color(RED);
+          delay(60);
+          LED_Color(OFF);
+          delay(60);
+        }
+        return;
+      }
+    case NW_MSG_CLOCK_NOT_SET:
+      {
+        //ALog's LEDtimeWrong(), syncopated on purpose: a broken clock gets a
+        //broken rhythm, so there is nothing to memorise.
+        for (uint16_t t = 0; t < NW_SIGNAL_WINDOW_MS; t += 550) {
+          LED_Color(RED);
+          delay(250);
+          LED_Color(OFF);
+          delay(100);
+          LED_Color(RED);
+          delay(100);
+          LED_Color(OFF);
+          delay(100);
+        }
+        return;
+      }
+    case NW_MSG_SENSOR_MISSING:
+      {
+        //Eight pips into silence: calling out and hearing nothing back.
+        for (uint8_t i = 0; i < 8; i++) {
+          LED_Color(RED);
+          delay(100);
+          LED_Color(OFF);
+          if (i < 7) delay(300);
+        }
+        return;
+      }
+    case NW_MSG_BATTERY_LOW:
+      {
+        //The slowest of the set, and the only amber one.
+        for (uint8_t i = 0; i < 3; i++) {
+          LED_Color(GOLD);
+          delay(500);
+          LED_Color(OFF);
+          delay(500);
+        }
+        return;
+      }
+    case NW_MSG_NO_SCHEDULE:
+      {
+        //Solid: the strongest state gets the one signal with no rhythm at all.
+        LED_Color(RED);
+        delay(NW_SIGNAL_WINDOW_MS);
+        LED_Color(OFF);
+        return;
+      }
+    default:
+      //A field message. The LED speaks at deployment; nobody is watching a
+      //streambed at three in the morning.
+      return;
   }
 }
 
@@ -805,7 +911,7 @@ void NW_Logger::noteFrom(NW_Sensor& sensor, bool beginFailed) {
   NW_BufferPrint p(_note, NOTE_CAPACITY, true);  //append to this row's notes
   if (p.length() > 0) p.print(';');
   sensor.printNote(p, beginFailed);
-  if (p.truncated()) _pages.latchNotice(0xF3);  //NoteTruncated: the row's notes did not fit
+  if (p.truncated()) raise(NW_MSG_NOTE_TRUNCATED);  //The row's notes did not fit
   Serial.print(F("Note: "));
   Serial.println(_note);
 }
@@ -901,12 +1007,9 @@ void NW_Logger::note(const char* word) {
   NW_BufferPrint p(_note, NOTE_CAPACITY, true);
   if (p.length() > 0) p.print(';');
   p.print(word);
-  if (p.truncated()) _pages.latchNotice(0xF3);  //NoteTruncated
+  if (p.truncated()) raise(NW_MSG_NOTE_TRUNCATED);
   Serial.print(F("Note: "));
   Serial.println(word);
-  LED_Color(ORANGE);
-  delay(300);
-  LED_Color(OFF);
 }
 
 void NW_Logger::buttonLog() {
