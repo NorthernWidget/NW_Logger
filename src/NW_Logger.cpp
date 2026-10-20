@@ -96,7 +96,8 @@ void NW_Logger::serialTimeSet() {
       }
       _rtc.setTime(2000 + dateTimeVals[0], dateTimeVals[1], dateTimeVals[2],
                    dateTimeVals[3], dateTimeVals[4], dateTimeVals[5]);
-      _pages.latchNotice(0x30);  //ClockSet
+      _pages.latchNotice(0x30);  //ClockSet, the served byte
+      raise(NW_MSG_CLOCK_SET);
     } else {
       //The clock keeps the time it had. Saying so matters: the old code read a
       //malformed stamp as zeroes and set the clock to the year 2000 in silence.
@@ -355,7 +356,10 @@ void NW_Logger::initLogFile() {
     snprintf(_fileNameC, sizeof(_fileNameC), "log%05d.csv", fileNum);
   }
   snprintf(_fileNameStaC, sizeof(_fileNameStaC), "sta%05d.csv", fileNum);  //The status file, same number
-  if (_fileNum != 0) _pages.latchNotice(0xF1);                             //NewLogFile: a later pair, not the first
+  if (_fileNum != 0) {                                                     //A later pair, not the first
+    _pages.latchNotice(0xF1);                                              //NewLogFile, the served byte
+    raise(NW_MSG_NEW_FILE);
+  }
   _fileNum = fileNum;
   Serial.print("FileNameC: ");
   Serial.println(_fileNameC);
