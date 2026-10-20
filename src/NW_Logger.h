@@ -452,10 +452,9 @@ protected:
   bool readIdentity();                                   ///< Pages 0-1 from EEPROM; _sn and _hwVersion from Page 0 (Schema 1) or the last 8 bytes (Schema 0). Returns whether Page 0 is valid; latches Page0Invalid if not
   void serialTimeSet();                                  ///< A YYMMDDHHMMSS string waiting on Serial sets the clock (notice ClockSet); prints the timestamp
   void attachLoggerInterrupts(bool buttonOnPCINT);       ///< LED pins, SD chip select, file times, the alarm ISR and the log button (INT0 or PCINT)
-  void ledReport();                                      ///< The self-test flags on the RGB LED, then "Ready to Log"
+  void printReadyToLog();                                ///< "Ready to Log" on Serial; the LED verdict comes from run(), once a row is on the card
   void attachExtInt();                                   ///< The external-interrupt counter, if setExtInt() named a pin
 
-  void blinkGood();
   /// @brief Measure the cycle that began at beganMillis and keep an interval that holds it.
   void keepInterval(uint32_t beganMillis);
 

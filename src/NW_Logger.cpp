@@ -137,51 +137,10 @@ void NW_Logger::attachLoggerInterrupts(bool buttonOnPCINT) {
   pinMode(LogInt, INPUT);
 }
 
-void NW_Logger::ledReport() {
-  digitalWrite(AuxLED, HIGH);
-
-  if (_onBoardError) {
-    LED_Color(RED);  //On board failure
-    delay(2000);
-  }
-  if (_sensorError) {
-    LED_Color(ORANGE);  //Sensor failure
-    delay(2000);
-  }
-  if (_timeError) {
-    LED_Color(CYAN);  //Time set error
-    delay(2000);
-  }
-  if (_sdCardMissing) {
-    LED_Color(PURPLE);  //Sd card not inserted
-    delay(2000);
-  }
-  // Battery voltage is below level where hardware functionality
-  // can be guaranteed
-  if (_batError) {
-    for (int i = 0; i < 10; i++) {
-      LED_Color(RED);
-      delay(100);
-      LED_Color(OFF);
-      delay(100);
-    }
-  }
-
-  // Battery charge % is at a concerning level; recommend replacing batteries
-  if (_batWarning && !_batError) {
-    for (int i = 0; i < 10; i++) {
-      LED_Color(GOLD);  //Low battery charge warning
-      delay(100);
-      LED_Color(OFF);
-      delay(100);
-    }
-  }
-  //Include battery error in test??
-  if (!_onBoardError && !_sensorError && !_timeError && !_sdCardMissing) {
-    LED_Color(GREEN);
-    delay(2000);
-  }
-
+void NW_Logger::printReadyToLog() {
+  //The self-tests are done. What they found is in the message set, and the LED
+  //says it once the first row is on the card: see showVerdict() in run(). This
+  //line stays where it has always been, so a transcript reads as before.
   Serial.print("\nReady to Log...\n\n");
 }
 
@@ -459,20 +418,6 @@ void NW_Logger::getTime() {
   _rtc.formatTime(_logTimeDate, sizeof(_logTimeDate), 0);
 }
 
-void NW_Logger::blinkGood() {
-  // Peppy blinky pattern to show that the logger has successfully initialized
-  digitalWrite(BlueLED, LOW);
-  delay(651);
-  digitalWrite(BlueLED, HIGH);
-  delay(300);
-  digitalWrite(BlueLED, LOW);
-  delay(100);
-  digitalWrite(BlueLED, HIGH);
-  delay(200);
-  digitalWrite(BlueLED, LOW);
-  delay(100);
-  digitalWrite(BlueLED, HIGH);
-}
 
 // Pass in function which returns string of data
 
@@ -494,8 +439,13 @@ void NW_Logger::run(unsigned long logInterval) {
     //Add inital data point
     addDataPoint();
     _newLog = false;  //Clear flag once log is started
-    blinkGood();      //Alert user to start of log
-    resetWDT();       //Clear alarm
+    //The aux LED has meant "busy" since the first instruction of begin(); it
+    //goes out here, with a row on the card, and the status LED gives the
+    //verdict in the same breath. Not in printReadyToLog(), or there is a dark
+    //gap while the file is opened and the row is written.
+    digitalWrite(AuxLED, HIGH);
+    showVerdict();
+    resetWDT();  //Clear alarm
   }
 
   if (_logEvent) {
