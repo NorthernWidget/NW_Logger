@@ -590,11 +590,14 @@ void NW_Logger::keepInterval(uint32_t beganMillis) {
 
 void NW_Logger::raise(uint8_t message) {
   if (message >= NW_MSG_COUNT) return;
-  _messages |= (uint16_t)1 << message;
+  _messages |= (uint32_t)1 << message;
   NW_BufferPrint p(_note, NOTE_CAPACITY, true);  //append to this row's notes
   if (p.length() > 0) p.print(';');
   p.print(nwMessageWord(message));
-  if (p.truncated()) raise(NW_MSG_NOTE_TRUNCATED);
+  //A full buffer is recorded in the set only. Raising it through this function
+  //would print into the same full buffer, truncate again, and recurse without
+  //bound; the word cannot fit anyway, and the set is what the verdict reads.
+  if (p.truncated()) _messages |= (uint32_t)1 << NW_MSG_NOTE_TRUNCATED;
   Serial.print(F("Note: "));
   Serial.println(nwMessageWord(message));
 }
@@ -606,7 +609,7 @@ uint8_t NW_Logger::worstMessage() {
   uint8_t worst = NW_MSG_READY;
   uint8_t band = NW_BAND_FINE;
   for (uint8_t m = 0; m < NW_MSG_COUNT; m++) {
-    if (!(_messages & ((uint16_t)1 << m))) continue;
+    if (!(_messages & ((uint32_t)1 << m))) continue;
     if (nwMessageBand(m) > band) {
       band = nwMessageBand(m);
       worst = m;
