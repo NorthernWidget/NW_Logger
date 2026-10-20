@@ -467,6 +467,7 @@ void NW_Logger::run(unsigned long logInterval) {
 
   if (_logEvent) {
     // Serial.println("Log Event!"); //DEBUG!
+    _messages = 0;  //This cycle's set; the boot set lived until the verdict
     // RTC.setAlarm(logInterval);  //Set/reset alarm //DEBUG!
     uint32_t began = millis();    //The cycle starts here: see keepInterval()
     addDataPoint();               //Write values to SD
