@@ -411,9 +411,17 @@ void NW_Logger::LED_Color(unsigned long val) {  //Set color of onboard led
   lum = (val >> 24) & 0xFF;
   //  lum = 255 - lum; //Invert since LEDs are open drain
 
-  analogWrite(RedLED, 255 - (red * lum) / 0xFF);
-  analogWrite(GreenLED, 255 - (green * lum) / 0xFF);
-  analogWrite(BlueLED, 255 - (blue * lum) / 0xFF);
+  //In 32 bits on purpose. An int is 16 bits on this part, so red * lum at full
+  //brightness is 255 * 255 = 65025, which overflows to -511 and makes the level
+  //257: analogWrite() then takes its PWM path instead of the plain port write it
+  //uses for 0 and 255. On the 16-bit Timer1 (red) OCR1A = 257 never matches an
+  //8-bit TOP and the pin sticks; on Timer2 (green, blue) it is a 1/255 duty, all
+  //but dark. Every full-brightness colour was affected, for years - blinkGood()
+  //looked fine only because it wrote the pin directly. NW-Sim's LED trace found
+  //it: red never moved after boot.
+  analogWrite(RedLED, (uint8_t)(255 - ((uint32_t)red * lum) / 0xFF));
+  analogWrite(GreenLED, (uint8_t)(255 - ((uint32_t)green * lum) / 0xFF));
+  analogWrite(BlueLED, (uint8_t)(255 - ((uint32_t)blue * lum) / 0xFF));
 }
 
 uint32_t NW_Logger::clockUnix() {
