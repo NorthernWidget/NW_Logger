@@ -69,3 +69,26 @@ lengthen: the watchdog's ceiling, at 4200 s
             a 900 s interval with a 1000 s cycle -> 1200 s
             a 900 s interval with a 5000 s cycle -> none: 1
             the same 5000 s cycle, no watchdog   -> 7200 s
+
+-- the messages --
+ 0  fine    Ready
+ 1  fine    LoggingStarted
+ 2  fine    NewLogFile
+ 3  fine    IntervalLengthened
+ 4  fine    IntervalShortened
+ 5  fine    ClockSet
+ 6  caught  BatteryLow
+ 7  caught  BME280Missing
+ 8  caught  RowNotWritten
+ 9  caught  NoteTruncated
+10  caught  CycleOverran
+11  caught  BackupWoke
+12  caught  OnBoardMissing
+13  caught  Page0Invalid
+14  bad     CardMissing
+15  bad     CardUnreadable
+16  bad     CardWriteFailed
+17  bad     NoSchedule
+18  bad     SensorMissing
+19  bad     ClockNotSet
+count 20; out of range -> band 0, word Unknown

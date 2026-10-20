@@ -10,6 +10,7 @@
 TwoWire Wire;  // the shared runner links NW_Device.cpp, which wants one
 #include "../../src/NW_TimeStamp.h"
 #include "../../src/NW_Schedule.h"
+#include "../../src/NW_Message.h"
 
 static void parse(const char* what, const char* s) {
   int v[6] = { -1, -1, -1, -1, -1, -1 };
@@ -24,9 +25,9 @@ static void parse(const char* what, const char* s) {
 // claims, and the backup swept for the three it claims. No board is needed, so
 // this runs here rather than in a transcript.
 static const uint32_t STEPS[] = {
-  1, 2, 3, 4, 5, 6, 10, 12, 15, 20, 30,                     //the divisors of 60, as seconds
-  60, 120, 180, 240, 300, 360, 600, 720, 900, 1200, 1800,   //the minutes dividing an hour
-  3600, 7200, 10800, 14400, 21600, 28800, 43200, 86400      //the hours dividing a day
+  1, 2, 3, 4, 5, 6, 10, 12, 15, 20, 30,                    //the divisors of 60, as seconds
+  60, 120, 180, 240, 300, 360, 600, 720, 900, 1200, 1800,  //the minutes dividing an hour
+  3600, 7200, 10800, 14400, 21600, 28800, 43200, 86400     //the hours dividing a day
 };
 static const uint8_t N_STEPS = sizeof(STEPS) / sizeof(STEPS[0]);
 
@@ -175,6 +176,19 @@ static void schedule() {
   printf("            the same 5000 s cycle, no watchdog   -> %lu s\n", (unsigned long)nwLengthenStep(900, 5000, 0));
 }
 
+// The message table, every row: the enum's order and the table's must agree, and
+// worstMessage() relies on the order within a band, so a reordering that moves
+// one and not the other shows here as a word beside the wrong value or band.
+static void messages() {
+  printf("\n-- the messages --\n");
+  static const char* const BANDS[] = { "fine", "caught", "bad" };
+  for (uint8_t m = 0; m < NW_MSG_COUNT; m++) {
+    printf("%2u  %-6s  %s\n", m, BANDS[nwMessageBand(m)], (const char*)nwMessageWord(m));
+  }
+  printf("count %u; out of range -> band %u, word %s\n", NW_MSG_COUNT,
+         nwMessageBand(NW_MSG_COUNT), (const char*)nwMessageWord(NW_MSG_COUNT));
+}
+
 int main() {
   // 1. What each sender in use actually sends. SetTime_GUI appends an 'x', a
   //    terminal appends CR LF, and a hand-typed stamp ends with nothing. The
@@ -211,5 +225,6 @@ int main() {
   parse("the null pointer", nullptr);
 
   schedule();
+  messages();
   return 0;
 }
