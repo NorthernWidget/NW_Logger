@@ -71,7 +71,10 @@ bool NW_Logger::readIdentity() {
     Serial.print(")");
     snprintf(_hwVersion, sizeof(_hwVersion), "%u.%u", p0[0x08], p0[0x09]);  //For the status file's boot row
   }
-  if (!schema1) _pages.latchFault(0xE3);  //Page 0 invalid: unprovisioned or corrupt
+  if (!schema1) {
+    _pages.latchFault(0xE3);  //Page 0 invalid: unprovisioned or corrupt (the served byte)
+    raise(NW_MSG_PAGE0_INVALID);
+  }
   if (strcmp(_sn, "FFFF-FFFF-FFFF-FFFF") == 0)
     Serial.println("WARNING: no serial number programmed in EEPROM");
   return schema1;
@@ -218,6 +221,7 @@ void NW_Logger::I2Ctest() {
       Serial.println(_i2cAdrOb[i], HEX);
       i2cTest = false;
       _onBoardError = true;
+      raise(NW_MSG_ONBOARD_MISSING);
     }
   }
 

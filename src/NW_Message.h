@@ -39,8 +39,9 @@ enum NW_Band : uint8_t {
 
 /**
  * @brief Everything a logger says about itself, hardware and runtime alike.
- * @details Ordered by band, which is a convenience for reading the list and not
- * a rule the code relies on: the band comes from the table, never from the value.
+ * @details Ordered by band. The band itself comes from the table, never from the
+ * value - but worstMessage() shows the FIRST message of the highest band, so the
+ * order WITHIN a band is a rule the code relies on. See the BAD block.
  */
 enum NW_Message : uint8_t {
   //Fine: no action.
@@ -58,14 +59,18 @@ enum NW_Message : uint8_t {
   NW_MSG_NOTE_TRUNCATED,   ///< The row's Note column did not hold every word.
   NW_MSG_CYCLE_OVERRAN,    ///< A cycle ran past its own interval and a slot was lost.
   NW_MSG_BACKUP_WOKE,      ///< The backup alarm woke the logger, so the primary was missed.
+  NW_MSG_ONBOARD_MISSING,  ///< An on-board chip other than the clock did not answer (the battery ADC on BUILD_B/C).
+  NW_MSG_PAGE0_INVALID,    ///< Page 0 is unprovisioned or corrupt: the board has no identity.
 
-  //Actively bad: act now.
-  NW_MSG_CLOCK_NOT_SET,      ///< The clock did not answer, or its oscillator is stopped.
+  //Actively bad: act now. Ordered by how little the data file can tell you,
+  //because worstMessage() shows the FIRST of the highest band on the one LED:
+  //with no card the LED is the only channel left, so the card outranks everything.
   NW_MSG_CARD_MISSING,       ///< No card is inserted.
   NW_MSG_CARD_UNREADABLE,    ///< A card is inserted and would not mount.
   NW_MSG_CARD_WRITE_FAILED,  ///< The boot write-and-read-back on the card failed.
-  NW_MSG_SENSOR_MISSING,     ///< An address the sketch declared does not answer.
   NW_MSG_NO_SCHEDULE,        ///< No interval holds this cycle inside the watchdog: it cannot log.
+  NW_MSG_SENSOR_MISSING,     ///< An address the sketch declared does not answer.
+  NW_MSG_CLOCK_NOT_SET,      ///< The clock did not answer, or its oscillator is stopped.
 
   NW_MSG_COUNT
 };
@@ -85,6 +90,8 @@ static const char nwMsgRowNotWritten[] PROGMEM = "RowNotWritten";
 static const char nwMsgNoteTruncated[] PROGMEM = "NoteTruncated";
 static const char nwMsgCycleOverran[] PROGMEM = "CycleOverran";
 static const char nwMsgBackupWoke[] PROGMEM = "BackupWoke";
+static const char nwMsgOnBoardMissing[] PROGMEM = "OnBoardMissing";
+static const char nwMsgPage0Invalid[] PROGMEM = "Page0Invalid";
 static const char nwMsgClockNotSet[] PROGMEM = "ClockNotSet";
 static const char nwMsgCardMissing[] PROGMEM = "CardMissing";
 static const char nwMsgCardUnreadable[] PROGMEM = "CardUnreadable";
@@ -113,12 +120,14 @@ static const NW_MessageInfo NW_MESSAGES[NW_MSG_COUNT] PROGMEM = {
   { NW_BAND_CAUGHT, nwMsgNoteTruncated },
   { NW_BAND_CAUGHT, nwMsgCycleOverran },
   { NW_BAND_CAUGHT, nwMsgBackupWoke },
-  { NW_BAND_BAD, nwMsgClockNotSet },
+  { NW_BAND_CAUGHT, nwMsgOnBoardMissing },
+  { NW_BAND_CAUGHT, nwMsgPage0Invalid },
   { NW_BAND_BAD, nwMsgCardMissing },
   { NW_BAND_BAD, nwMsgCardUnreadable },
   { NW_BAND_BAD, nwMsgCardWriteFailed },
+  { NW_BAND_BAD, nwMsgNoSchedule },
   { NW_BAND_BAD, nwMsgSensorMissing },
-  { NW_BAND_BAD, nwMsgNoSchedule }
+  { NW_BAND_BAD, nwMsgClockNotSet },
 };
 
 /// @brief The band a message belongs to, or NW_BAND_FINE for a value out of range.
@@ -129,7 +138,7 @@ inline uint8_t nwMessageBand(uint8_t message) {
 
 /// @brief A message's word for the Note column and the serial line, from flash.
 inline const __FlashStringHelper* nwMessageWord(uint8_t message) {
-  if (message >= NW_MSG_COUNT) return F("Unknown");
+  if (message >= NW_MSG_COUNT) return (const __FlashStringHelper*)F("Unknown");  //The cast is for the host stub, where F() is a plain string
   return (const __FlashStringHelper*)pgm_read_ptr(&NW_MESSAGES[message].word);
 }
 
