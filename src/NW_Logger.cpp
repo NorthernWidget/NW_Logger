@@ -201,6 +201,7 @@ void NW_Logger::I2Ctest() {
       Serial.println(_i2cAdr[i], HEX);
       i2cTest = false;
       _sensorError = true;
+      raise(NW_MSG_SENSOR_MISSING);
     }
   }
 
@@ -241,8 +242,10 @@ void NW_Logger::SDtest() {
     sdTestFailed = true;
     _sdTestFailed = true;
     _sdCardMissing = true;  //Card not inserted
+    raise(NW_MSG_CARD_MISSING);
   } else if (!_sd.begin(SD_CS)) {
     _onBoardError = true;
+    raise(NW_MSG_CARD_UNREADABLE);  //Inserted, and would not mount
     sdTestFailed = true;
     _sdTestFailed = true;
   }
@@ -277,13 +280,16 @@ void NW_Logger::SDtest() {
     File dataRead = _sd.open(_fileNameTestC, FILE_READ);
     if (dataRead) {
       dataRead.read(testDigits, randLength);
+      bool mismatch = false;
       for (int i = 0; i < randLength - 1; i++) {  //Test random value string
         if (testDigits[i] != randDigits[i]) {
           sdTestFailed = true;
           _sdTestFailed = true;
           _onBoardError = true;
+          mismatch = true;
         }
       }
+      if (mismatch) raise(NW_MSG_CARD_WRITE_FAILED);  //Once, not once per byte
     }
     dataRead.close();
 
@@ -313,6 +319,7 @@ void NW_Logger::clockTest() {
     if (_rtc.getValue(5) == testSeconds) {
       _onBoardError = true;  // If clock is not incrementing
       _clockError = true;
+      raise(NW_MSG_CLOCK_NOT_SET);
       oscStop = true;  // Oscillator not running
       Serial.println(" FAIL (oscillator stopped)");
     }
@@ -323,6 +330,7 @@ void NW_Logger::clockTest() {
       unsigned int yearNow = _rtc.getValue(0);
       if (yearNow == 0) {
         _timeError = true;
+        raise(NW_MSG_CLOCK_NOT_SET);  //Powered up at 2000: never set
         Serial.println(" PASS, BAD TIME");
       } else {
         Serial.println(" PASS");
@@ -332,6 +340,7 @@ void NW_Logger::clockTest() {
     Serial.println(" FAIL");
     _onBoardError = true;
     _clockError = true;
+    raise(NW_MSG_CLOCK_NOT_SET);  //Did not answer on the bus
   }
 }
 
