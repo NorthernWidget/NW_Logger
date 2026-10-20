@@ -650,29 +650,34 @@ void NW_Logger::signal(uint8_t message) {
         }
         return;
       }
-    case NW_MSG_BATTERY_LOW:
-      {
-        //The slowest of the set, and the only amber one.
-        for (uint8_t i = 0; i < 3; i++) {
-          LED_Color(GOLD);
-          delay(500);
-          LED_Color(OFF);
-          delay(500);
-        }
-        return;
-      }
-    case NW_MSG_NO_SCHEDULE:
-      {
-        //Solid: the strongest state gets the one signal with no rhythm at all.
-        LED_Color(RED);
-        delay(NW_SIGNAL_WINDOW_MS);
-        LED_Color(OFF);
-        return;
-      }
     default:
-      //A field message. The LED speaks at deployment; nobody is watching a
-      //streambed at three in the morning.
-      return;
+      //Every other message is rendered by its band, so no verdict is ever dark:
+      //the reviewer found a dead BME280 - CAUGHT, and the logger still logs -
+      //left the status LED unlit after the aux went out, which reads as a dead
+      //board. FINE renders nothing, because a field message has no observer.
+      switch (nwMessageBand(message)) {
+        case NW_BAND_CAUGHT:
+          {
+            //The slowest of the set, and the only amber one.
+            for (uint8_t i = 0; i < 3; i++) {
+              LED_Color(GOLD);
+              delay(500);
+              LED_Color(OFF);
+              delay(500);
+            }
+            return;
+          }
+        case NW_BAND_BAD:
+          {
+            //Solid: the strongest state gets the one signal with no rhythm.
+            LED_Color(RED);
+            delay(NW_SIGNAL_WINDOW_MS);
+            LED_Color(OFF);
+            return;
+          }
+        default:
+          return;
+      }
   }
 }
 
