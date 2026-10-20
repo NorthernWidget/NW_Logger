@@ -575,19 +575,7 @@ void NW_Logger::raise(uint8_t message) {
 }
 
 uint8_t NW_Logger::worstMessage() {
-  //The highest band raised; within a band the first, which is the list's own
-  //order. A band of FINE answers READY, so a clean boot gets the chirp rather
-  //than whichever housekeeping message happened to be raised.
-  uint8_t worst = NW_MSG_READY;
-  uint8_t band = NW_BAND_FINE;
-  for (uint8_t m = 0; m < NW_MSG_COUNT; m++) {
-    if (!(_messages & ((uint32_t)1 << m))) continue;
-    if (nwMessageBand(m) > band) {
-      band = nwMessageBand(m);
-      worst = m;
-    }
-  }
-  return band == NW_BAND_FINE ? NW_MSG_READY : worst;
+  return nwWorstMessage(_messages);  //Pure, in NW_Message.h, where the harness tests it
 }
 
 void NW_Logger::showVerdict() {

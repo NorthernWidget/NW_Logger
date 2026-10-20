@@ -92,3 +92,18 @@ lengthen: the watchdog's ceiling, at 4200 s
 18  bad     SensorMissing
 19  bad     ClockNotSet
 count 20; out of range -> band 0, word Unknown
+
+-- the verdict --
+nothing raised                               -> Ready              (0)
+fine only: started, new file, lengthened     -> Ready              (0)
+one caught: BME missing                      -> BME280Missing      (7)
+caught beats fine                            -> RowNotWritten      (8)
+two caught: first in list order              -> BME280Missing      (7)
+bad beats caught                             -> SensorMissing      (18)
+no card AND clock not set                    -> CardMissing        (14)
+every bad at once                            -> CardMissing        (14)
+no schedule AND clock not set                -> NoSchedule         (17)
+sensor missing AND clock not set             -> SensorMissing      (18)
+write failed AND sensor missing              -> CardWriteFailed    (16)
+a bit past the end, alone                    -> Ready              (0)
+a bit past the end, with a caught            -> NoteTruncated      (9)

@@ -189,6 +189,31 @@ static void messages() {
          nwMessageBand(NW_MSG_COUNT), (const char*)nwMessageWord(NW_MSG_COUNT));
 }
 
+// What the LED shows for a set of raised messages. The property fix 5 changed is
+// here as a line: with no card AND an unset clock, the card wins, because without
+// a card the LED is the only channel the logger has left.
+static void verdict(const char* what, uint32_t set) {
+  uint8_t m = nwWorstMessage(set);
+  printf("%-44s -> %-18s (%u)\n", what, (const char*)nwMessageWord(m), m);
+}
+#define BIT(m) ((uint32_t)1 << (m))
+static void verdicts() {
+  printf("\n-- the verdict --\n");
+  verdict("nothing raised", 0);
+  verdict("fine only: started, new file, lengthened", BIT(NW_MSG_LOG_STARTED) | BIT(NW_MSG_NEW_FILE) | BIT(NW_MSG_INTERVAL_LENGTHENED));
+  verdict("one caught: BME missing", BIT(NW_MSG_BME_MISSING));
+  verdict("caught beats fine", BIT(NW_MSG_LOG_STARTED) | BIT(NW_MSG_ROW_NOT_WRITTEN));
+  verdict("two caught: first in list order", BIT(NW_MSG_ROW_NOT_WRITTEN) | BIT(NW_MSG_BME_MISSING));
+  verdict("bad beats caught", BIT(NW_MSG_BME_MISSING) | BIT(NW_MSG_SENSOR_MISSING));
+  verdict("no card AND clock not set", BIT(NW_MSG_CLOCK_NOT_SET) | BIT(NW_MSG_CARD_MISSING));
+  verdict("every bad at once", BIT(NW_MSG_CARD_MISSING) | BIT(NW_MSG_CARD_UNREADABLE) | BIT(NW_MSG_CARD_WRITE_FAILED) | BIT(NW_MSG_NO_SCHEDULE) | BIT(NW_MSG_SENSOR_MISSING) | BIT(NW_MSG_CLOCK_NOT_SET));
+  verdict("no schedule AND clock not set", BIT(NW_MSG_NO_SCHEDULE) | BIT(NW_MSG_CLOCK_NOT_SET));
+  verdict("sensor missing AND clock not set", BIT(NW_MSG_SENSOR_MISSING) | BIT(NW_MSG_CLOCK_NOT_SET));
+  verdict("write failed AND sensor missing", BIT(NW_MSG_CARD_WRITE_FAILED) | BIT(NW_MSG_SENSOR_MISSING));
+  verdict("a bit past the end, alone", BIT(NW_MSG_COUNT));
+  verdict("a bit past the end, with a caught", BIT(NW_MSG_COUNT) | BIT(NW_MSG_NOTE_TRUNCATED));
+}
+
 int main() {
   // 1. What each sender in use actually sends. SetTime_GUI appends an 'x', a
   //    terminal appends CR LF, and a hand-typed stamp ends with nothing. The
@@ -226,5 +251,6 @@ int main() {
 
   schedule();
   messages();
+  verdicts();
   return 0;
 }

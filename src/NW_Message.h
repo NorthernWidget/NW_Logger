@@ -136,6 +136,27 @@ inline uint8_t nwMessageBand(uint8_t message) {
   return pgm_read_byte(&NW_MESSAGES[message].band);
 }
 
+/**
+ * @brief The message the LED shows for a set: the first of the highest band, or READY.
+ * @details A set is one bit per message. The highest band present wins; within it,
+ * the first in list order - which is why the order within BAD is a rule and not a
+ * convenience. A set that is empty or merely FINE answers READY, so a clean boot
+ * gets the chirp rather than whichever housekeeping message happened to be raised.
+ * Bits at or above NW_MSG_COUNT are ignored. Pure, so the host harness tests it.
+ */
+inline uint8_t nwWorstMessage(uint32_t set) {
+  uint8_t worst = NW_MSG_READY;
+  uint8_t band = NW_BAND_FINE;
+  for (uint8_t m = 0; m < NW_MSG_COUNT; m++) {
+    if (!(set & ((uint32_t)1 << m))) continue;
+    if (nwMessageBand(m) > band) {
+      band = nwMessageBand(m);
+      worst = m;
+    }
+  }
+  return band == NW_BAND_FINE ? NW_MSG_READY : worst;
+}
+
 /// @brief A message's word for the Note column and the serial line, from flash.
 inline const __FlashStringHelper* nwMessageWord(uint8_t message) {
   if (message >= NW_MSG_COUNT) return (const __FlashStringHelper*)F("Unknown");  //The cast is for the host stub, where F() is a plain string
