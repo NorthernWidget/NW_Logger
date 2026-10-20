@@ -917,18 +917,22 @@ int NW_Logger::logRow() {
   _sd.chdir("/");
   _sd.chdir(_sn);
   File DataFile = _sd.open(_fileNameC, FILE_WRITE);
-  if (!DataFile) return -1;
-  printDataRow(DataFile);
-  for (uint8_t i = 0; i < _numSensors; i++) {
-    if (_sensors[i] == this) continue;
-    _sensors[i]->printDataRow(DataFile);
+  bool written = (bool)DataFile;
+  if (written) {
+    printDataRow(DataFile);
+    for (uint8_t i = 0; i < _numSensors; i++) {
+      if (_sensors[i] == this) continue;
+      _sensors[i]->printDataRow(DataFile);
+    }
+    DataFile.print(_note);
+    DataFile.println();
+    _sdIndex = DataFile.position();  //Where the next row starts
+    DataFile.close();
   }
-  DataFile.print(_note);
-  DataFile.println();
-  _sdIndex = DataFile.position();  //Where the next row starts
-  DataFile.close();
 
-  //The monitor gets the same row. printDataRow() prints stored values, so a
+  //The monitor gets the same row whether or not the card took it: a bench with
+  //no card inserted is the most common bench there is, and it used to show only
+  //"Note: RowNotWritten" each cycle. printDataRow() prints stored values, so a
   //second pass costs formatting and no bus traffic.
   printDataRow(Serial);
   for (uint8_t i = 0; i < _numSensors; i++) {
@@ -936,8 +940,15 @@ int NW_Logger::logRow() {
     _sensors[i]->printDataRow(Serial);
   }
   Serial.println(_note);
-  _note[0] = '\0';  //One row's worth of notes
-  return 0;
+  _note[0] = '\0';  //One row's worth of notes, kept or not; it does not accumulate
+
+  if (written) {
+    //A row reached the card: one short blip, in the colour that means all well.
+    LED_Color(BLUE);
+    delay(20);
+    LED_Color(OFF);
+  }
+  return written ? 0 : -1;
 }
 
 bool NW_Logger::watch(NW_Sensor& sensor, uint8_t address) {
