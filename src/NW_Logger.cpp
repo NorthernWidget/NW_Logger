@@ -450,8 +450,12 @@ void NW_Logger::run(unsigned long logInterval) {
     _rtc.setAlarm(_logInterval);
     initLogFile();  //Start a new file each time log button is pressed
     //Add inital data point
-    addDataPoint();
-    _newLog = false;  //Clear flag once log is started
+    uint32_t began = millis();  //The first cycle is measured like every other, so
+    addDataPoint();             //NO_SCHEDULE and CYCLE_OVERRAN can reach the verdict
+    _newLog = false;            //Clear flag once log is started
+    uint32_t before = _logInterval;
+    keepInterval(began);
+    if (_logInterval != before) _rtc.setAlarm(_logInterval);  //Re-arm only if lengthened
     //The aux LED has meant "busy" since the first instruction of begin(); it
     //goes out here, with a row on the card, and the status LED gives the
     //verdict in the same breath. Not in printReadyToLog(), or there is a dark
