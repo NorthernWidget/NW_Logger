@@ -646,6 +646,7 @@ void NW_Logger::signal(uint8_t message) {
         return;
       }
     case NW_MSG_CARD_MISSING:
+    case NW_MSG_CARD_UNREADABLE:
     case NW_MSG_CARD_WRITE_FAILED:
       {
         //ALog's LEDwarn(), a fast even flutter: nothing is being recorded. One

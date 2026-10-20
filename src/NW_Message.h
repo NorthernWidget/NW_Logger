@@ -49,6 +49,7 @@ enum NW_Message : uint8_t {
   NW_MSG_NEW_FILE,             ///< A new data and status file pair was opened.
   NW_MSG_INTERVAL_LENGTHENED,  ///< The logging interval was lengthened.
   NW_MSG_INTERVAL_SHORTENED,   ///< The logging interval was shortened.
+  NW_MSG_CLOCK_SET,            ///< The clock was set from a stamp over the serial line.
 
   //Caught: act at the next visit.
   NW_MSG_BATTERY_LOW,      ///< Below the warning threshold, with cells fitted.
@@ -61,6 +62,7 @@ enum NW_Message : uint8_t {
   //Actively bad: act now.
   NW_MSG_CLOCK_NOT_SET,      ///< The clock did not answer, or its oscillator is stopped.
   NW_MSG_CARD_MISSING,       ///< No card is inserted.
+  NW_MSG_CARD_UNREADABLE,    ///< A card is inserted and would not mount.
   NW_MSG_CARD_WRITE_FAILED,  ///< The boot write-and-read-back on the card failed.
   NW_MSG_SENSOR_MISSING,     ///< An address the sketch declared does not answer.
   NW_MSG_NO_SCHEDULE,        ///< No interval holds this cycle inside the watchdog: it cannot log.
@@ -76,6 +78,7 @@ static const char nwMsgLogStarted[] PROGMEM = "LoggingStarted";
 static const char nwMsgNewFile[] PROGMEM = "NewLogFile";
 static const char nwMsgIntervalLengthened[] PROGMEM = "IntervalLengthened";
 static const char nwMsgIntervalShortened[] PROGMEM = "IntervalShortened";
+static const char nwMsgClockSet[] PROGMEM = "ClockSet";
 static const char nwMsgBatteryLow[] PROGMEM = "BatteryLow";
 static const char nwMsgBmeMissing[] PROGMEM = "BME280Missing";
 static const char nwMsgRowNotWritten[] PROGMEM = "RowNotWritten";
@@ -84,9 +87,12 @@ static const char nwMsgCycleOverran[] PROGMEM = "CycleOverran";
 static const char nwMsgBackupWoke[] PROGMEM = "BackupWoke";
 static const char nwMsgClockNotSet[] PROGMEM = "ClockNotSet";
 static const char nwMsgCardMissing[] PROGMEM = "CardMissing";
+static const char nwMsgCardUnreadable[] PROGMEM = "CardUnreadable";
 static const char nwMsgCardWriteFailed[] PROGMEM = "CardWriteFailed";
 static const char nwMsgSensorMissing[] PROGMEM = "SensorMissing";
 static const char nwMsgNoSchedule[] PROGMEM = "NoSchedule";
+
+static_assert(NW_MSG_COUNT <= 32, "the message set is a uint32_t: one bit per message");
 
 /// @brief A message's band and its word, the one place both are decided.
 struct NW_MessageInfo {
@@ -100,6 +106,7 @@ static const NW_MessageInfo NW_MESSAGES[NW_MSG_COUNT] PROGMEM = {
   { NW_BAND_FINE, nwMsgNewFile },
   { NW_BAND_FINE, nwMsgIntervalLengthened },
   { NW_BAND_FINE, nwMsgIntervalShortened },
+  { NW_BAND_FINE, nwMsgClockSet },
   { NW_BAND_CAUGHT, nwMsgBatteryLow },
   { NW_BAND_CAUGHT, nwMsgBmeMissing },
   { NW_BAND_CAUGHT, nwMsgRowNotWritten },
@@ -108,6 +115,7 @@ static const NW_MessageInfo NW_MESSAGES[NW_MSG_COUNT] PROGMEM = {
   { NW_BAND_CAUGHT, nwMsgBackupWoke },
   { NW_BAND_BAD, nwMsgClockNotSet },
   { NW_BAND_BAD, nwMsgCardMissing },
+  { NW_BAND_BAD, nwMsgCardUnreadable },
   { NW_BAND_BAD, nwMsgCardWriteFailed },
   { NW_BAND_BAD, nwMsgSensorMissing },
   { NW_BAND_BAD, nwMsgNoSchedule }

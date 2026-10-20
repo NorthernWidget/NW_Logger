@@ -517,7 +517,7 @@ protected:
   unsigned long _logInterval = 0;               // seconds, the interval kept; served on Page 3
   unsigned long _intervalAsked = 0;             // seconds, what the sketch passed to run()
   uint32_t _cycleMillisMax = 0;                 // the longest cycle seen, measured across addDataPoint()
-  uint16_t _messages = 0;                       // one bit per NW_MSG_*: what this logger has said about itself
+  uint32_t _messages = 0;                       // one bit per NW_MSG_*: what this logger has said about itself
   uint16_t _fileNum = 0;                        // the number of the current log and status file pair
   NW_Sensor* _sensors[MAX_SENSORS];             // sensors whose reports go to the status file (watch())
   uint8_t _sensorAddress[MAX_SENSORS] = { 0 };  // where each one is, from watch()
