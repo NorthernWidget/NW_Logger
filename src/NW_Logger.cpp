@@ -586,18 +586,34 @@ uint8_t NW_Logger::worstMessage() {
   return nwWorstMessage(_messages);  //Pure, in NW_Message.h, where the harness tests it
 }
 
+//Each segment fills the same three-second window, so the user is told once how
+//long to look: watch the status LED after the aux light goes out. Between
+//segments a full second of dark, twice the longest dark inside any pattern, so
+//it reads as a separator and not a beat (Andy, 2026-10-21).
+static const uint16_t NW_SIGNAL_WINDOW_MS = 3000;
+static const uint16_t NW_SIGNAL_GAP_MS = 1000;
+
 void NW_Logger::showVerdict() {
-  signal(worstMessage());
+  //One segment per distinct rhythm raised, worst to least (Andy, 2026-10-21):
+  //the first is what the one-message verdict always showed, and the rest is
+  //what one LED could not say before. With no card there is no file, so this
+  //is the only channel that can name the second fault.
+  uint8_t sequence[NW_RHYTHM_COUNT];
+  uint8_t n = nwVerdictSequence(_messages, sequence);
+  if (n == 0) {
+    signal(NW_MSG_READY, 0);
+    return;
+  }
+  uint8_t caught = nwCountBand(_messages, NW_BAND_CAUGHT);
+  for (uint8_t i = 0; i < n; i++) {
+    if (i > 0) delay(NW_SIGNAL_GAP_MS);
+    signal(sequence[i], caught);
+  }
 }
 
-//The five patterns, each inside the same three-second window, so the user is
-//told once how long to look: watch the status LED for three seconds after the
-//aux light goes out.
-static const uint16_t NW_SIGNAL_WINDOW_MS = 3000;
-
-void NW_Logger::signal(uint8_t message) {
-  switch (message) {
-    case NW_MSG_READY:
+void NW_Logger::signal(uint8_t message, uint8_t caught) {
+  switch (nwMessageRhythm(message)) {
+    case NW_RHYTHM_CHIRP:
       {
         //ALog's LEDgood(), long-short-short. Its own length, not the window's.
         LED_Color(BLUE);
@@ -613,13 +629,12 @@ void NW_Logger::signal(uint8_t message) {
         LED_Color(OFF);
         return;
       }
-    case NW_MSG_CARD_MISSING:
-    case NW_MSG_CARD_UNREADABLE:
-    case NW_MSG_CARD_WRITE_FAILED:
+    case NW_RHYTHM_FLUTTER:
       {
         //ALog's LEDwarn(), a fast even flutter: nothing is being recorded. One
-        //pattern for both messages, because the user does the same thing about
-        //either - reseat or replace the card - and the file says which it was.
+        //pattern for all three card messages, because the user does the same
+        //thing about any of them - reseat or replace the card - and the file
+        //says which it was.
         for (uint16_t t = 0; t < NW_SIGNAL_WINDOW_MS; t += 120) {
           LED_Color(RED);
           delay(60);
@@ -628,7 +643,7 @@ void NW_Logger::signal(uint8_t message) {
         }
         return;
       }
-    case NW_MSG_CLOCK_NOT_SET:
+    case NW_RHYTHM_SYNCOPATION:
       {
         //ALog's LEDtimeWrong(), syncopated on purpose: a broken clock gets a
         //broken rhythm, so there is nothing to memorise.
@@ -644,7 +659,7 @@ void NW_Logger::signal(uint8_t message) {
         }
         return;
       }
-    case NW_MSG_SENSOR_MISSING:
+    case NW_RHYTHM_PIPS:
       {
         //Eight pips into silence: calling out and hearing nothing back.
         for (uint8_t i = 0; i < 8; i++) {
@@ -655,34 +670,42 @@ void NW_Logger::signal(uint8_t message) {
         }
         return;
       }
-    default:
-      //Every other message is rendered by its band, so no verdict is ever dark:
-      //the reviewer found a dead BME280 - CAUGHT, and the logger still logs -
-      //left the status LED unlit after the aux went out, which reads as a dead
-      //board. FINE renders nothing, because a field message has no observer.
-      switch (nwMessageBand(message)) {
-        case NW_BAND_CAUGHT:
-          {
-            //The slowest of the set, and the only amber one.
-            for (uint8_t i = 0; i < 3; i++) {
-              LED_Color(GOLD);
-              delay(500);
-              LED_Color(OFF);
-              delay(500);
-            }
-            return;
-          }
-        case NW_BAND_BAD:
-          {
-            //Solid: the strongest state gets the one signal with no rhythm.
-            LED_Color(RED);
-            delay(NW_SIGNAL_WINDOW_MS);
-            LED_Color(OFF);
-            return;
-          }
-        default:
-          return;
+    case NW_RHYTHM_AMBER:
+      {
+        //The whole CAUGHT band plays this once, so no verdict is ever dark: the
+        //reviewer found a dead BME280 - CAUGHT, and the logger still logs - left
+        //the status LED unlit after the aux went out, which reads as a dead
+        //board. It opens with a count, one 100 ms blip per CAUGHT message raised
+        //at 200 ms apart, then 300 ms dark, then the 500/500 x3 that names the
+        //band (Andy, 2026-10-21). 100/200 is 3.3 flashes a second: flashes are
+        //counted accurately only up to about four a second (Cheatham and White
+        //1952), and a faster train looks like the card flutter. Six raisable
+        //today: 4.9 s at most.
+        for (uint8_t i = 0; i < caught; i++) {
+          LED_Color(GOLD);
+          delay(100);
+          LED_Color(OFF);
+          delay(i + 1 < caught ? 200 : 300);
+        }
+        for (uint8_t i = 0; i < 3; i++) {
+          LED_Color(GOLD);
+          delay(500);
+          LED_Color(OFF);
+          delay(500);
+        }
+        return;
       }
+    case NW_RHYTHM_SOLID:
+      {
+        //Solid: the strongest state gets the one signal with no rhythm.
+        LED_Color(RED);
+        delay(NW_SIGNAL_WINDOW_MS);
+        LED_Color(OFF);
+        return;
+      }
+    default:
+      //FINE renders nothing, because a field message has no observer.
+      return;
   }
 }
 

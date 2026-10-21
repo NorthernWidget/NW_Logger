@@ -428,9 +428,13 @@ protected:
      * A message with no pattern shows nothing, which is most of them: an
      * interval change at three in the morning has no observer, so the field
      * messages go to the Note column alone.
-     * @param message an NW_MSG_* value
+     *
+     * One call plays one segment; showVerdict() strings the segments together.
+     * @param message an NW_MSG_* value; what plays is nwMessageRhythm(message)
+     * @param caught how many CAUGHT messages are raised, which the amber
+     * segment counts out before its 500/500 x3; ignored by every other rhythm
      */
-  virtual void signal(uint8_t message);
+  virtual void signal(uint8_t message, uint8_t caught);
 
   /**
      * @brief Record a message: into the Note column, onto the serial line, and into this cycle's set.
@@ -443,7 +447,13 @@ protected:
   /// @brief The raised message of the highest band, or NW_MSG_READY when nothing is wrong.
   uint8_t worstMessage();
 
-  /// @brief Show the band of the worst message raised so far: the boot verdict.
+  /**
+     * @brief The boot verdict: every distinct rhythm raised, worst to least.
+     * @details One three-second segment per rhythm with a second of dark between,
+     * from nwVerdictSequence(); the first segment is the worst message, so a
+     * one-fault boot looks exactly as it always did. Nothing worse than FINE
+     * plays the READY chirp alone.
+     */
   void showVerdict();
 
   // --- begin() in pieces: a board's begin() calls these in order around its own steps ---
