@@ -157,6 +157,84 @@ inline uint8_t nwWorstMessage(uint32_t set) {
   return band == NW_BAND_FINE ? NW_MSG_READY : worst;
 }
 
+/// @brief How many raised messages of a set belong to a band.
+inline uint8_t nwCountBand(uint32_t set, uint8_t band) {
+  uint8_t n = 0;
+  for (uint8_t m = 0; m < NW_MSG_COUNT; m++) {
+    if (!(set & ((uint32_t)1 << m))) continue;
+    if (nwMessageBand(m) == band) n++;
+  }
+  return n;
+}
+
+/**
+ * @brief The forms the status LED can play: one per distinct rhythm, not one per message.
+ * @details Identity rides on the rhythm as a shape (Andy, 2026-10-09), so two messages
+ * that share a form are one thing to the eye and the file tells them apart. The
+ * verdict plays each form raised once, worst to least (Andy, 2026-10-21).
+ */
+enum NW_Rhythm : uint8_t {
+  NW_RHYTHM_NONE = 0,     ///< FINE: the file alone, no observer in the field
+  NW_RHYTHM_CHIRP,        ///< READY: blue long-short-short, ALog's LEDgood()
+  NW_RHYTHM_FLUTTER,      ///< the card, any of its three: red 60/60
+  NW_RHYTHM_SOLID,        ///< NO_SCHEDULE, and any BAD message without a form of its own: red, steady
+  NW_RHYTHM_PIPS,         ///< SENSOR_MISSING: red 100/300 x8
+  NW_RHYTHM_SYNCOPATION,  ///< CLOCK_NOT_SET: red 250/100/100/100, ALog's LEDtimeWrong()
+  NW_RHYTHM_AMBER,        ///< the CAUGHT band: one blip per message raised, then 500/500 x3
+  NW_RHYTHM_COUNT
+};
+
+/// @brief The rhythm a message plays, decided here so signal() and the sequence agree.
+inline uint8_t nwMessageRhythm(uint8_t message) {
+  switch (message) {
+    case NW_MSG_READY:
+      return NW_RHYTHM_CHIRP;
+    case NW_MSG_CARD_MISSING:
+    case NW_MSG_CARD_UNREADABLE:
+    case NW_MSG_CARD_WRITE_FAILED:
+      return NW_RHYTHM_FLUTTER;
+    case NW_MSG_SENSOR_MISSING:
+      return NW_RHYTHM_PIPS;
+    case NW_MSG_CLOCK_NOT_SET:
+      return NW_RHYTHM_SYNCOPATION;
+    default:
+      switch (nwMessageBand(message)) {
+        case NW_BAND_BAD:
+          return NW_RHYTHM_SOLID;
+        case NW_BAND_CAUGHT:
+          return NW_RHYTHM_AMBER;
+        default:
+          return NW_RHYTHM_NONE;
+      }
+  }
+}
+
+/**
+ * @brief The segments the verdict plays for a set, worst to least: one message per distinct rhythm.
+ * @details BAD first in list order, then the CAUGHT band once; a rhythm already in
+ * the sequence is not added again, so the three card messages or eight CAUGHT
+ * messages give one segment each. FINE messages add nothing. Returns the number of
+ * segments written to out, which must hold NW_RHYTHM_COUNT entries; zero means
+ * nothing worse than FINE was raised and the caller plays READY. When the count is
+ * not zero, out[0] is nwWorstMessage(set): the harness checks that over every set.
+ */
+inline uint8_t nwVerdictSequence(uint32_t set, uint8_t* out) {
+  uint8_t n = 0;
+  uint8_t seen = 0;  //one bit per NW_Rhythm
+  for (int8_t band = NW_BAND_BAD; band >= NW_BAND_CAUGHT; band--) {
+    for (uint8_t m = 0; m < NW_MSG_COUNT; m++) {
+      if (!(set & ((uint32_t)1 << m))) continue;
+      if (nwMessageBand(m) != band) continue;
+      uint8_t rhythm = nwMessageRhythm(m);
+      if (seen & (1 << rhythm)) continue;
+      seen |= 1 << rhythm;
+      out[n] = m;
+      n++;
+    }
+  }
+  return n;
+}
+
 /// @brief A message's word for the Note column and the serial line, from flash.
 inline const __FlashStringHelper* nwMessageWord(uint8_t message) {
   if (message >= NW_MSG_COUNT) return (const __FlashStringHelper*)F("Unknown");  //The cast is for the host stub, where F() is a plain string

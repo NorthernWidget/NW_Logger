@@ -107,3 +107,18 @@ sensor missing AND clock not set             -> SensorMissing      (18)
 write failed AND sensor missing              -> CardWriteFailed    (16)
 a bit past the end, alone                    -> Ready              (0)
 a bit past the end, with a caught            -> NoteTruncated      (9)
+
+-- the sequence --
+nothing raised                               -> 0 segment(s), 0 caught:
+fine only: started, new file, lengthened     -> 0 segment(s), 0 caught:
+one caught: BME missing                      -> 1 segment(s), 1 caught: BME280Missing
+two caught: one amber, counted two           -> 1 segment(s), 2 caught: BME280Missing
+all eight caught                             -> 1 segment(s), 8 caught: BatteryLow
+bad then caught                              -> 2 segment(s), 1 caught: SensorMissing BME280Missing
+no card AND clock not set                    -> 2 segment(s), 0 caught: CardMissing ClockNotSet
+three card messages: one flutter             -> 1 segment(s), 0 caught: CardMissing
+every bad at once                            -> 4 segment(s), 0 caught: CardMissing NoSchedule SensorMissing ClockNotSet
+everything at once                           -> 5 segment(s), 8 caught: CardMissing NoSchedule SensorMissing ClockNotSet BatteryLow
+the dead bus: clock, battery ADC, BME        -> 2 segment(s), 2 caught: ClockNotSet BME280Missing
+a bit past the end, with a caught            -> 1 segment(s), 1 caught: NoteTruncated
+every set: 1048576 checked, 0 broke a rule

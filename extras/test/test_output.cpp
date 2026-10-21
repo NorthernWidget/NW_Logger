@@ -214,6 +214,58 @@ static void verdicts() {
   verdict("a bit past the end, with a caught", BIT(NW_MSG_COUNT) | BIT(NW_MSG_NOTE_TRUNCATED));
 }
 
+// The segments the verdict plays, worst to least, one per distinct rhythm, and
+// the count the amber segment opens with (Andy, 2026-10-21). The first segment
+// is always what the one-message verdict showed, so nothing a Margay user learnt
+// changes; the rest is what the one LED could not say before.
+static void sequence(const char* what, uint32_t set) {
+  uint8_t seq[NW_RHYTHM_COUNT];
+  uint8_t n = nwVerdictSequence(set, seq);
+  printf("%-44s -> %u segment(s), %u caught:", what, n, nwCountBand(set, NW_BAND_CAUGHT));
+  for (uint8_t i = 0; i < n; i++) printf(" %s", (const char*)nwMessageWord(seq[i]));
+  printf("\n");
+}
+static void sequences() {
+  printf("\n-- the sequence --\n");
+  sequence("nothing raised", 0);
+  sequence("fine only: started, new file, lengthened", BIT(NW_MSG_LOG_STARTED) | BIT(NW_MSG_NEW_FILE) | BIT(NW_MSG_INTERVAL_LENGTHENED));
+  sequence("one caught: BME missing", BIT(NW_MSG_BME_MISSING));
+  sequence("two caught: one amber, counted two", BIT(NW_MSG_ROW_NOT_WRITTEN) | BIT(NW_MSG_BME_MISSING));
+  sequence("all eight caught", BIT(NW_MSG_BATTERY_LOW) | BIT(NW_MSG_BME_MISSING) | BIT(NW_MSG_ROW_NOT_WRITTEN) | BIT(NW_MSG_NOTE_TRUNCATED) | BIT(NW_MSG_CYCLE_OVERRAN) | BIT(NW_MSG_BACKUP_WOKE) | BIT(NW_MSG_ONBOARD_MISSING) | BIT(NW_MSG_PAGE0_INVALID));
+  sequence("bad then caught", BIT(NW_MSG_BME_MISSING) | BIT(NW_MSG_SENSOR_MISSING));
+  sequence("no card AND clock not set", BIT(NW_MSG_CLOCK_NOT_SET) | BIT(NW_MSG_CARD_MISSING));
+  sequence("three card messages: one flutter", BIT(NW_MSG_CARD_MISSING) | BIT(NW_MSG_CARD_UNREADABLE) | BIT(NW_MSG_CARD_WRITE_FAILED));
+  sequence("every bad at once", BIT(NW_MSG_CARD_MISSING) | BIT(NW_MSG_CARD_UNREADABLE) | BIT(NW_MSG_CARD_WRITE_FAILED) | BIT(NW_MSG_NO_SCHEDULE) | BIT(NW_MSG_SENSOR_MISSING) | BIT(NW_MSG_CLOCK_NOT_SET));
+  sequence("everything at once", ((uint32_t)1 << NW_MSG_COUNT) - 1);
+  sequence("the dead bus: clock, battery ADC, BME", BIT(NW_MSG_CLOCK_NOT_SET) | BIT(NW_MSG_ONBOARD_MISSING) | BIT(NW_MSG_BME_MISSING));
+  sequence("a bit past the end, with a caught", BIT(NW_MSG_COUNT) | BIT(NW_MSG_NOTE_TRUNCATED));
+  // The rules, over every set of the twenty bits: the first segment is the worst
+  // message, no rhythm plays twice, and the sequence never exceeds the five
+  // rhythms that have a fault to name.
+  uint32_t checked = 0;
+  uint32_t broke = 0;
+  for (uint32_t set = 0; set < ((uint32_t)1 << NW_MSG_COUNT); set++) {
+    uint8_t seq[NW_RHYTHM_COUNT];
+    uint8_t n = nwVerdictSequence(set, seq);
+    uint8_t worst = nwWorstMessage(set);
+    bool ok = true;
+    if (n == 0) {
+      ok = (worst == NW_MSG_READY);
+    } else {
+      ok = (seq[0] == worst) && (n <= 5);
+      uint8_t seen = 0;
+      for (uint8_t i = 0; i < n && ok; i++) {
+        uint8_t r = nwMessageRhythm(seq[i]);
+        if (seen & (1 << r)) ok = false;
+        seen |= 1 << r;
+      }
+    }
+    if (!ok) broke++;
+    checked++;
+  }
+  printf("every set: %lu checked, %lu broke a rule\n", (unsigned long)checked, (unsigned long)broke);
+}
+
 int main() {
   // 1. What each sender in use actually sends. SetTime_GUI appends an 'x', a
   //    terminal appends CR LF, and a hand-typed stamp ends with nothing. The
@@ -252,5 +304,6 @@ int main() {
   schedule();
   messages();
   verdicts();
+  sequences();
   return 0;
 }
