@@ -43,7 +43,6 @@ Andy Wickert
 #define BLUE 0xFF0000FFL
 #define MAROON 0xFF800000L
 #define GOLD 0xFFFFD700L
-#define ORANGE 0xFFFFA500L
 #define PURPLE 0xFF800080L
 #define CYAN 0xFF00FFFFL
 #define BLACK_ALERT 0x802019FFL  ///< Deep blue-violet; used internally for error states.
@@ -246,8 +245,8 @@ public:
      * @brief Note a one-word condition for the current log row.
      * @details The word goes in the Note column, the last column of every
      * row, written without a comma after it so the row ends cleanly. It is
-     * also printed to Serial and shown as an orange pulse on the LED. Several
-     * notes in one interval are joined with ';'. Cleared after each row.
+     * also printed to Serial. Several notes in one interval are joined with
+     * ';'. Cleared after each row.
      * Typical words: NotAnswering, OldFirmware, NotSchema1, LiDARTimeout.
      * @param word One word (no commas) naming the condition.
      */
