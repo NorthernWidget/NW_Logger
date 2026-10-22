@@ -231,7 +231,7 @@ static void sequences() {
   sequence("fine only: started, new file, lengthened", BIT(NW_MSG_LOG_STARTED) | BIT(NW_MSG_NEW_FILE) | BIT(NW_MSG_INTERVAL_LENGTHENED));
   sequence("one caught: BME missing", BIT(NW_MSG_BME_MISSING));
   sequence("two caught: one amber, counted two", BIT(NW_MSG_ROW_NOT_WRITTEN) | BIT(NW_MSG_BME_MISSING));
-  sequence("all eight caught", BIT(NW_MSG_BATTERY_LOW) | BIT(NW_MSG_BME_MISSING) | BIT(NW_MSG_ROW_NOT_WRITTEN) | BIT(NW_MSG_NOTE_TRUNCATED) | BIT(NW_MSG_CYCLE_OVERRAN) | BIT(NW_MSG_BACKUP_WOKE) | BIT(NW_MSG_ONBOARD_MISSING) | BIT(NW_MSG_PAGE0_INVALID));
+  sequence("all seven caught", BIT(NW_MSG_BME_MISSING) | BIT(NW_MSG_ROW_NOT_WRITTEN) | BIT(NW_MSG_NOTE_TRUNCATED) | BIT(NW_MSG_CYCLE_OVERRAN) | BIT(NW_MSG_BACKUP_WOKE) | BIT(NW_MSG_ONBOARD_MISSING) | BIT(NW_MSG_PAGE0_INVALID));
   sequence("bad then caught", BIT(NW_MSG_BME_MISSING) | BIT(NW_MSG_SENSOR_MISSING));
   sequence("no card AND clock not set", BIT(NW_MSG_CLOCK_NOT_SET) | BIT(NW_MSG_CARD_MISSING));
   sequence("three card messages: one flutter", BIT(NW_MSG_CARD_MISSING) | BIT(NW_MSG_CARD_UNREADABLE) | BIT(NW_MSG_CARD_WRITE_FAILED));

@@ -52,8 +52,8 @@ enum NW_Message : uint8_t {
   NW_MSG_INTERVAL_SHORTENED,   ///< The logging interval was shortened.
   NW_MSG_CLOCK_SET,            ///< The clock was set from a stamp over the serial line.
 
-  //Caught: act at the next visit.
-  NW_MSG_BATTERY_LOW,      ///< Below the warning threshold, with cells fitted.
+  //Caught: act at the next visit. Battery state is not a message: it is the
+  //colour of the READY chirp at boot, and the voltage column in every row.
   NW_MSG_BME_MISSING,      ///< The on-board environment sensor did not answer; the logger still logs.
   NW_MSG_ROW_NOT_WRITTEN,  ///< A data row could not be written to the card.
   NW_MSG_NOTE_TRUNCATED,   ///< The row's Note column did not hold every word.
@@ -84,7 +84,6 @@ static const char nwMsgNewFile[] PROGMEM = "NewLogFile";
 static const char nwMsgIntervalLengthened[] PROGMEM = "IntervalLengthened";
 static const char nwMsgIntervalShortened[] PROGMEM = "IntervalShortened";
 static const char nwMsgClockSet[] PROGMEM = "ClockSet";
-static const char nwMsgBatteryLow[] PROGMEM = "BatteryLow";
 static const char nwMsgBmeMissing[] PROGMEM = "BME280Missing";
 static const char nwMsgRowNotWritten[] PROGMEM = "RowNotWritten";
 static const char nwMsgNoteTruncated[] PROGMEM = "NoteTruncated";
@@ -114,7 +113,6 @@ static const NW_MessageInfo NW_MESSAGES[NW_MSG_COUNT] PROGMEM = {
   { NW_BAND_FINE, nwMsgIntervalLengthened },
   { NW_BAND_FINE, nwMsgIntervalShortened },
   { NW_BAND_FINE, nwMsgClockSet },
-  { NW_BAND_CAUGHT, nwMsgBatteryLow },
   { NW_BAND_CAUGHT, nwMsgBmeMissing },
   { NW_BAND_CAUGHT, nwMsgRowNotWritten },
   { NW_BAND_CAUGHT, nwMsgNoteTruncated },
