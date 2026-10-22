@@ -448,11 +448,12 @@ protected:
   uint8_t worstMessage();
 
   /**
-     * @brief The boot verdict: every distinct rhythm raised, worst to least.
+     * @brief The boot verdict: every distinct rhythm raised, worst to least, then the chirp.
      * @details One three-second segment per rhythm with a second of dark between,
      * from nwVerdictSequence(); the first segment is the worst message, so a
-     * one-fault boot looks exactly as it always did. Nothing worse than FINE
-     * plays the READY chirp alone.
+     * one-fault boot opens exactly as it always did. The READY chirp follows,
+     * because the logger is running, unless a card message or NO_SCHEDULE says
+     * it is not (nwChirpAfter()). Nothing raised plays the chirp alone.
      */
   void showVerdict();
 

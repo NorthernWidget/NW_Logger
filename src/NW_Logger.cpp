@@ -600,15 +600,17 @@ void NW_Logger::showVerdict() {
   //is the only channel that can name the second fault.
   uint8_t sequence[NW_RHYTHM_COUNT];
   uint8_t n = nwVerdictSequence(_messages, sequence);
-  if (n == 0) {
-    signal(NW_MSG_READY, 0);
-    return;
-  }
   uint8_t caught = nwCountBand(_messages, NW_BAND_CAUGHT);
   for (uint8_t i = 0; i < n; i++) {
     if (i > 0) delay(NW_SIGNAL_GAP_MS);
     signal(sequence[i], caught);
   }
+  //Then the chirp, because the logger is running: it comes after the faults
+  //(Andy, 2026-10-22) and is left out only when rows cannot reach the card on
+  //a schedule, which nwChirpAfter() decides from the rhythms raised.
+  if (!nwChirpAfter(_messages)) return;
+  if (n > 0) delay(NW_SIGNAL_GAP_MS);
+  signal(NW_MSG_READY, 0);
 }
 
 void NW_Logger::signal(uint8_t message, uint8_t caught) {
