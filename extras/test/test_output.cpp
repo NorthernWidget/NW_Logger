@@ -223,7 +223,7 @@ static void sequence(const char* what, uint32_t set) {
   uint8_t n = nwVerdictSequence(set, seq);
   printf("%-44s -> %u segment(s), %u caught:", what, n, nwCountBand(set, NW_BAND_CAUGHT));
   for (uint8_t i = 0; i < n; i++) printf(" %s", (const char*)nwMessageWord(seq[i]));
-  printf("\n");
+  printf("%s\n", nwChirpAfter(set) ? " + chirp" : " (no chirp)");
 }
 static void sequences() {
   printf("\n-- the sequence --\n");
@@ -239,9 +239,14 @@ static void sequences() {
   sequence("everything at once", ((uint32_t)1 << NW_MSG_COUNT) - 1);
   sequence("the dead bus: clock, battery ADC, BME", BIT(NW_MSG_CLOCK_NOT_SET) | BIT(NW_MSG_ONBOARD_MISSING) | BIT(NW_MSG_BME_MISSING));
   sequence("a bit past the end, with a caught", BIT(NW_MSG_COUNT) | BIT(NW_MSG_NOTE_TRUNCATED));
+  sequence("clock not set alone: runs, so chirps", BIT(NW_MSG_CLOCK_NOT_SET));
+  sequence("sensor missing alone: runs, so chirps", BIT(NW_MSG_SENSOR_MISSING));
+  sequence("no schedule alone: cannot run", BIT(NW_MSG_NO_SCHEDULE));
+  sequence("card write failed and BME missing", BIT(NW_MSG_CARD_WRITE_FAILED) | BIT(NW_MSG_BME_MISSING));
   // The rules, over every set of the twenty bits: the first segment is the worst
-  // message, no rhythm plays twice, and the sequence never exceeds the five
-  // rhythms that have a fault to name.
+  // message, no rhythm plays twice, the sequence never exceeds the five rhythms
+  // that have a fault to name, and the chirp is suppressed exactly when a card
+  // message or NO_SCHEDULE is in the set.
   uint32_t checked = 0;
   uint32_t broke = 0;
   for (uint32_t set = 0; set < ((uint32_t)1 << NW_MSG_COUNT); set++) {
@@ -260,6 +265,8 @@ static void sequences() {
         seen |= 1 << r;
       }
     }
+    uint32_t stops = BIT(NW_MSG_CARD_MISSING) | BIT(NW_MSG_CARD_UNREADABLE) | BIT(NW_MSG_CARD_WRITE_FAILED) | BIT(NW_MSG_NO_SCHEDULE);
+    if (nwChirpAfter(set) != ((set & stops) == 0)) ok = false;
     if (!ok) broke++;
     checked++;
   }

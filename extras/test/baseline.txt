@@ -109,16 +109,20 @@ a bit past the end, alone                    -> Ready              (0)
 a bit past the end, with a caught            -> NoteTruncated      (9)
 
 -- the sequence --
-nothing raised                               -> 0 segment(s), 0 caught:
-fine only: started, new file, lengthened     -> 0 segment(s), 0 caught:
-one caught: BME missing                      -> 1 segment(s), 1 caught: BME280Missing
-two caught: one amber, counted two           -> 1 segment(s), 2 caught: BME280Missing
-all eight caught                             -> 1 segment(s), 8 caught: BatteryLow
-bad then caught                              -> 2 segment(s), 1 caught: SensorMissing BME280Missing
-no card AND clock not set                    -> 2 segment(s), 0 caught: CardMissing ClockNotSet
-three card messages: one flutter             -> 1 segment(s), 0 caught: CardMissing
-every bad at once                            -> 4 segment(s), 0 caught: CardMissing NoSchedule SensorMissing ClockNotSet
-everything at once                           -> 5 segment(s), 8 caught: CardMissing NoSchedule SensorMissing ClockNotSet BatteryLow
-the dead bus: clock, battery ADC, BME        -> 2 segment(s), 2 caught: ClockNotSet BME280Missing
-a bit past the end, with a caught            -> 1 segment(s), 1 caught: NoteTruncated
+nothing raised                               -> 0 segment(s), 0 caught: + chirp
+fine only: started, new file, lengthened     -> 0 segment(s), 0 caught: + chirp
+one caught: BME missing                      -> 1 segment(s), 1 caught: BME280Missing + chirp
+two caught: one amber, counted two           -> 1 segment(s), 2 caught: BME280Missing + chirp
+all eight caught                             -> 1 segment(s), 8 caught: BatteryLow + chirp
+bad then caught                              -> 2 segment(s), 1 caught: SensorMissing BME280Missing + chirp
+no card AND clock not set                    -> 2 segment(s), 0 caught: CardMissing ClockNotSet (no chirp)
+three card messages: one flutter             -> 1 segment(s), 0 caught: CardMissing (no chirp)
+every bad at once                            -> 4 segment(s), 0 caught: CardMissing NoSchedule SensorMissing ClockNotSet (no chirp)
+everything at once                           -> 5 segment(s), 8 caught: CardMissing NoSchedule SensorMissing ClockNotSet BatteryLow (no chirp)
+the dead bus: clock, battery ADC, BME        -> 2 segment(s), 2 caught: ClockNotSet BME280Missing + chirp
+a bit past the end, with a caught            -> 1 segment(s), 1 caught: NoteTruncated + chirp
+clock not set alone: runs, so chirps         -> 1 segment(s), 0 caught: ClockNotSet + chirp
+sensor missing alone: runs, so chirps        -> 1 segment(s), 0 caught: SensorMissing + chirp
+no schedule alone: cannot run                -> 1 segment(s), 0 caught: NoSchedule (no chirp)
+card write failed and BME missing            -> 2 segment(s), 1 caught: CardWriteFailed BME280Missing (no chirp)
 every set: 1048576 checked, 0 broke a rule
