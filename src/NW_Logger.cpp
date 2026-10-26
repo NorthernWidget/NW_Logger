@@ -701,8 +701,10 @@ void NW_Logger::signal(uint8_t message, uint8_t caught) {
         //at 200 ms apart, then 300 ms dark, then the 500/500 x3 that names the
         //band (Andy, 2026-10-21). 100/200 is 3.3 flashes a second: flashes are
         //counted accurately only up to about four a second (Cheatham and White
-        //1952), and a faster train looks like the card flutter. Six raisable
-        //today: 4.9 s at most.
+        //1952), and a faster train looks like the card flutter. Seven CAUGHT
+        //messages exist: 4.7 s at most. The last gap is dropped, as the pips
+        //drop theirs, so the segment ends on light and the second of dark that
+        //follows it is the same as after every other segment (Andy, 2026-10-26).
         for (uint8_t i = 0; i < caught; i++) {
           LED_Color(GOLD);
           delay(100);
@@ -713,7 +715,7 @@ void NW_Logger::signal(uint8_t message, uint8_t caught) {
           LED_Color(GOLD);
           delay(500);
           LED_Color(OFF);
-          delay(500);
+          if (i < 2) delay(500);
         }
         return;
       }
