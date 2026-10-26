@@ -223,7 +223,8 @@ static void sequence(const char* what, uint32_t set) {
   uint8_t n = nwVerdictSequence(set, seq);
   printf("%-44s -> %u segment(s), %u caught:", what, n, nwCountBand(set, NW_BAND_CAUGHT));
   for (uint8_t i = 0; i < n; i++) printf(" %s", (const char*)nwMessageWord(seq[i]));
-  printf("%s\n", nwChirpAfter(set) ? " + chirp" : " (no chirp)");
+  static const char* const CHIRPS[] = { " (no chirp)", " + long-and-buzz", " + chirp" };
+  printf("%s\n", CHIRPS[nwChirpForm(set)]);
 }
 static void sequences() {
   printf("\n-- the sequence --\n");
@@ -242,11 +243,13 @@ static void sequences() {
   sequence("clock not set alone: runs, so chirps", BIT(NW_MSG_CLOCK_NOT_SET));
   sequence("sensor missing alone: runs, so chirps", BIT(NW_MSG_SENSOR_MISSING));
   sequence("no schedule alone: cannot run", BIT(NW_MSG_NO_SCHEDULE));
+  sequence("no card AND no schedule: none outranks", BIT(NW_MSG_CARD_MISSING) | BIT(NW_MSG_NO_SCHEDULE));
   sequence("card write failed and BME missing", BIT(NW_MSG_CARD_WRITE_FAILED) | BIT(NW_MSG_BME_MISSING));
   // The rules, over every set of the twenty bits: the first segment is the worst
   // message, no rhythm plays twice, the sequence never exceeds the five rhythms
-  // that have a fault to name, and the chirp is suppressed exactly when a card
-  // message or NO_SCHEDULE is in the set.
+  // that have a fault to name, and the chirp's form is decided by the set: none
+  // with NO_SCHEDULE, the long-and-buzz with a card message and no NO_SCHEDULE,
+  // the full chirp otherwise.
   uint32_t checked = 0;
   uint32_t broke = 0;
   for (uint32_t set = 0; set < ((uint32_t)1 << NW_MSG_COUNT); set++) {
@@ -265,8 +268,9 @@ static void sequences() {
         seen |= 1 << r;
       }
     }
-    uint32_t stops = BIT(NW_MSG_CARD_MISSING) | BIT(NW_MSG_CARD_UNREADABLE) | BIT(NW_MSG_CARD_WRITE_FAILED) | BIT(NW_MSG_NO_SCHEDULE);
-    if (nwChirpAfter(set) != ((set & stops) == 0)) ok = false;
+    uint32_t card = BIT(NW_MSG_CARD_MISSING) | BIT(NW_MSG_CARD_UNREADABLE) | BIT(NW_MSG_CARD_WRITE_FAILED);
+    uint8_t expected = (set & BIT(NW_MSG_NO_SCHEDULE)) ? NW_CHIRP_NONE : ((set & card) ? NW_CHIRP_WARNING : NW_CHIRP_FULL);
+    if (nwChirpForm(set) != expected) ok = false;
     if (!ok) broke++;
     checked++;
   }

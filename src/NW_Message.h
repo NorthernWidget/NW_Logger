@@ -233,23 +233,32 @@ inline uint8_t nwVerdictSequence(uint32_t set, uint8_t* out) {
   return n;
 }
 
+/// @brief What the chirp says after a verdict's fault segments: the logger's running state.
+enum NW_Chirp : uint8_t {
+  NW_CHIRP_NONE = 0,  ///< not cycling: NO_SCHEDULE, so no chirp at all
+  NW_CHIRP_WARNING,   ///< cycling but not saving: a card message; long, then the card's fast pulses
+  NW_CHIRP_FULL       ///< cycling and saving: long-short-short
+};
+
 /**
- * @brief Whether the READY chirp plays after a verdict's fault segments.
- * @details The chirp means the logger is running: rows are reaching the card on a
- * schedule. A fault that does not stop that - an unset clock, a missing sensor,
- * anything CAUGHT - plays its own segment and then the chirp (Andy, 2026-10-22).
- * A fault that does stop it suppresses the chirp: the card messages (no row can be
- * written) and NO_SCHEDULE (no cycle can be kept). Those are the FLUTTER and SOLID
- * rhythms, so the test is on the rhythm and not on a list of messages.
+ * @brief Which chirp follows the fault segments.
+ * @details The chirp means the logger is running, so it plays after the faults; its
+ * form says how (Andy, 2026-10-26). A fault that stops rows reaching the card but
+ * not the cycle - any card message, the FLUTTER rhythm - keeps the chirp's long and
+ * replaces the two shorts with the card's fast pulses: "running, not saving". A fault
+ * that stops the cycle - NO_SCHEDULE, the SOLID rhythm - leaves no chirp. An unset
+ * clock, a missing sensor, anything CAUGHT: the full chirp. The test is on the
+ * rhythm and not on a list of messages, and NONE outranks WARNING.
  */
-inline bool nwChirpAfter(uint32_t set) {
+inline uint8_t nwChirpForm(uint32_t set) {
+  uint8_t form = NW_CHIRP_FULL;
   for (uint8_t m = 0; m < NW_MSG_COUNT; m++) {
     if (!(set & ((uint32_t)1 << m))) continue;
     uint8_t rhythm = nwMessageRhythm(m);
-    if (rhythm == NW_RHYTHM_FLUTTER) return false;
-    if (rhythm == NW_RHYTHM_SOLID) return false;
+    if (rhythm == NW_RHYTHM_SOLID) return NW_CHIRP_NONE;
+    if (rhythm == NW_RHYTHM_FLUTTER) form = NW_CHIRP_WARNING;
   }
-  return true;
+  return form;
 }
 
 /// @brief A message's word for the Note column and the serial line, from flash.

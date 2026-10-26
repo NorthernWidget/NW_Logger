@@ -114,8 +114,8 @@ one caught: BME missing                      -> 1 segment(s), 1 caught: BME280Mi
 two caught: one amber, counted two           -> 1 segment(s), 2 caught: BME280Missing + chirp
 all seven caught                             -> 1 segment(s), 7 caught: BME280Missing + chirp
 bad then caught                              -> 2 segment(s), 1 caught: SensorMissing BME280Missing + chirp
-no card AND clock not set                    -> 2 segment(s), 0 caught: CardMissing ClockNotSet (no chirp)
-three card messages: one flutter             -> 1 segment(s), 0 caught: CardMissing (no chirp)
+no card AND clock not set                    -> 2 segment(s), 0 caught: CardMissing ClockNotSet + long-and-buzz
+three card messages: one flutter             -> 1 segment(s), 0 caught: CardMissing + long-and-buzz
 every bad at once                            -> 4 segment(s), 0 caught: CardMissing NoSchedule SensorMissing ClockNotSet (no chirp)
 everything at once                           -> 5 segment(s), 7 caught: CardMissing NoSchedule SensorMissing ClockNotSet BME280Missing (no chirp)
 the dead bus: clock, battery ADC, BME        -> 2 segment(s), 2 caught: ClockNotSet BME280Missing + chirp
@@ -123,5 +123,6 @@ a bit past the end, with a caught            -> 1 segment(s), 1 caught: NoteTrun
 clock not set alone: runs, so chirps         -> 1 segment(s), 0 caught: ClockNotSet + chirp
 sensor missing alone: runs, so chirps        -> 1 segment(s), 0 caught: SensorMissing + chirp
 no schedule alone: cannot run                -> 1 segment(s), 0 caught: NoSchedule (no chirp)
-card write failed and BME missing            -> 2 segment(s), 1 caught: CardWriteFailed BME280Missing (no chirp)
+no card AND no schedule: none outranks       -> 2 segment(s), 0 caught: CardMissing NoSchedule (no chirp)
+card write failed and BME missing            -> 2 segment(s), 1 caught: CardWriteFailed BME280Missing + long-and-buzz
 every set: 524288 checked, 0 broke a rule
