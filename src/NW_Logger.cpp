@@ -606,29 +606,49 @@ void NW_Logger::showVerdict() {
     signal(sequence[i], caught);
   }
   //Then the chirp, because the logger is running: it comes after the faults
-  //(Andy, 2026-10-22) and is left out only when rows cannot reach the card on
-  //a schedule, which nwChirpAfter() decides from the rhythms raised.
-  if (!nwChirpAfter(_messages)) return;
+  //(Andy, 2026-10-22) in the form nwChirpForm() decides from the rhythms
+  //raised - full when saving, long-and-buzz when a card fault stops saving but
+  //not the cycle, none when NO_SCHEDULE stops the cycle (Andy, 2026-10-26).
+  uint8_t form = nwChirpForm(_messages);
+  if (form == NW_CHIRP_NONE) return;
   if (n > 0) delay(NW_SIGNAL_GAP_MS);
-  signal(NW_MSG_READY, 0);
+  chirp(form);
+}
+
+void NW_Logger::chirp(uint8_t form) {
+  //ALog's LEDgood(), long-short-short, its own length and not the window's.
+  //Blue until the battery colour is built (QUEUE: "Battery state is the
+  //chirp's colour"); the long is where that colour will go.
+  LED_Color(BLUE);
+  delay(1000);
+  LED_Color(OFF);
+  delay(300);
+  if (form == NW_CHIRP_WARNING) {
+    //Running, not saving: the two shorts become five of the card flutter's
+    //60/60 pulses in its red, 600 ms, so the ear ties the buzz to the card
+    //fault that played before it (Andy, 2026-10-26).
+    for (uint8_t i = 0; i < 5; i++) {
+      LED_Color(RED);
+      delay(60);
+      LED_Color(OFF);
+      delay(60);
+    }
+    return;
+  }
+  LED_Color(BLUE);
+  delay(100);
+  LED_Color(OFF);
+  delay(100);
+  LED_Color(BLUE);
+  delay(100);
+  LED_Color(OFF);
 }
 
 void NW_Logger::signal(uint8_t message, uint8_t caught) {
   switch (nwMessageRhythm(message)) {
     case NW_RHYTHM_CHIRP:
       {
-        //ALog's LEDgood(), long-short-short. Its own length, not the window's.
-        LED_Color(BLUE);
-        delay(1000);
-        LED_Color(OFF);
-        delay(300);
-        LED_Color(BLUE);
-        delay(100);
-        LED_Color(OFF);
-        delay(100);
-        LED_Color(BLUE);
-        delay(100);
-        LED_Color(OFF);
+        chirp(NW_CHIRP_FULL);
         return;
       }
     case NW_RHYTHM_FLUTTER:

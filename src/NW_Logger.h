@@ -444,6 +444,12 @@ protected:
      */
   void raise(uint8_t message);
 
+  /**
+     * @brief The chirp, in one of its forms: long-short-short, or long then the card's fast pulses.
+     * @param form an NW_Chirp value other than NW_CHIRP_NONE, from nwChirpForm()
+     */
+  virtual void chirp(uint8_t form);
+
   /// @brief The raised message of the highest band, or NW_MSG_READY when nothing is wrong.
   uint8_t worstMessage();
 
@@ -451,9 +457,10 @@ protected:
      * @brief The boot verdict: every distinct rhythm raised, worst to least, then the chirp.
      * @details One three-second segment per rhythm with a second of dark between,
      * from nwVerdictSequence(); the first segment is the worst message, so a
-     * one-fault boot opens exactly as it always did. The READY chirp follows,
-     * because the logger is running, unless a card message or NO_SCHEDULE says
-     * it is not (nwChirpAfter()). Nothing raised plays the chirp alone.
+     * one-fault boot opens exactly as it always did. The chirp follows, because
+     * the logger is running: full when it is saving, long-and-buzz when a card
+     * fault stops saving but not the cycle, none when NO_SCHEDULE stops the cycle
+     * (nwChirpForm()). Nothing raised plays the full chirp alone.
      */
   void showVerdict();
 
