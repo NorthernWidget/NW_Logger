@@ -61,6 +61,7 @@ enum NW_Message : uint8_t {
   NW_MSG_BACKUP_WOKE,      ///< The backup alarm woke the logger, so the primary was missed.
   NW_MSG_ONBOARD_MISSING,  ///< An on-board chip other than the clock did not answer (the battery ADC on BUILD_B/C).
   NW_MSG_PAGE0_INVALID,    ///< Page 0 is unprovisioned or corrupt: the board has no identity.
+  NW_MSG_ON_BACKUP_POWER,  ///< The main battery is absent or could not hold the bus; the backup is carrying the logger (Okapi).
 
   //Actively bad: act now. Ordered by how little the data file can tell you,
   //because worstMessage() shows the FIRST of the highest band on the one LED:
@@ -91,6 +92,7 @@ static const char nwMsgCycleOverran[] PROGMEM = "CycleOverran";
 static const char nwMsgBackupWoke[] PROGMEM = "BackupWoke";
 static const char nwMsgOnBoardMissing[] PROGMEM = "OnBoardMissing";
 static const char nwMsgPage0Invalid[] PROGMEM = "Page0Invalid";
+static const char nwMsgOnBackupPower[] PROGMEM = "OnBackupPower";
 static const char nwMsgClockNotSet[] PROGMEM = "ClockNotSet";
 static const char nwMsgCardMissing[] PROGMEM = "CardMissing";
 static const char nwMsgCardUnreadable[] PROGMEM = "CardUnreadable";
@@ -120,6 +122,7 @@ static const NW_MessageInfo NW_MESSAGES[NW_MSG_COUNT] PROGMEM = {
   { NW_BAND_CAUGHT, nwMsgBackupWoke },
   { NW_BAND_CAUGHT, nwMsgOnBoardMissing },
   { NW_BAND_CAUGHT, nwMsgPage0Invalid },
+  { NW_BAND_CAUGHT, nwMsgOnBackupPower },
   { NW_BAND_BAD, nwMsgCardMissing },
   { NW_BAND_BAD, nwMsgCardUnreadable },
   { NW_BAND_BAD, nwMsgCardWriteFailed },
@@ -237,6 +240,7 @@ inline uint8_t nwVerdictSequence(uint32_t set, uint8_t* out) {
 enum NW_Chirp : uint8_t {
   NW_CHIRP_NONE = 0,  ///< not cycling: NO_SCHEDULE, so no chirp at all
   NW_CHIRP_WARNING,   ///< cycling but not saving: a card message; long, then the card's fast pulses
+  NW_CHIRP_BACKUP,    ///< cycling and saving on the backup battery: long-short-short-short
   NW_CHIRP_FULL       ///< cycling and saving: long-short-short
 };
 
@@ -247,8 +251,10 @@ enum NW_Chirp : uint8_t {
  * not the cycle - any card message, the FLUTTER rhythm - keeps the chirp's long and
  * replaces the two shorts with the card's fast pulses: "running, not saving". A fault
  * that stops the cycle - NO_SCHEDULE, the SOLID rhythm - leaves no chirp. An unset
- * clock, a missing sensor, anything CAUGHT: the full chirp. The test is on the
- * rhythm and not on a list of messages, and NONE outranks WARNING.
+ * clock, a missing sensor, anything CAUGHT: the full chirp - except ON_BACKUP_POWER,
+ * which keeps the full chirp's meaning (running and saving) and adds a beat to say
+ * the backup battery is carrying it (Andy, 2026-10-27). The test is on the rhythm
+ * and not on a list of messages; NONE outranks WARNING, which outranks BACKUP.
  */
 inline uint8_t nwChirpForm(uint32_t set) {
   uint8_t form = NW_CHIRP_FULL;
@@ -257,6 +263,7 @@ inline uint8_t nwChirpForm(uint32_t set) {
     uint8_t rhythm = nwMessageRhythm(m);
     if (rhythm == NW_RHYTHM_SOLID) return NW_CHIRP_NONE;
     if (rhythm == NW_RHYTHM_FLUTTER) form = NW_CHIRP_WARNING;
+    if (m == NW_MSG_ON_BACKUP_POWER && form == NW_CHIRP_FULL) form = NW_CHIRP_BACKUP;
   }
   return form;
 }
