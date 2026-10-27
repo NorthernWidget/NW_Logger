@@ -113,7 +113,7 @@ nothing raised                               -> 0 segment(s), 0 caught: + chirp
 fine only: started, new file, lengthened     -> 0 segment(s), 0 caught: + chirp
 one caught: BME missing                      -> 1 segment(s), 1 caught: BME280Missing + chirp
 two caught: one amber, counted two           -> 1 segment(s), 2 caught: BME280Missing + chirp
-all eight caught                             -> 1 segment(s), 8 caught: BME280Missing + chirp on backup (3 shorts)
+all eight caught                             -> 1 segment(s), 8 caught: BME280Missing + chirp
 bad then caught                              -> 2 segment(s), 1 caught: SensorMissing BME280Missing + chirp
 no card AND clock not set                    -> 2 segment(s), 0 caught: CardMissing ClockNotSet + long-and-buzz
 three card messages: one flutter             -> 1 segment(s), 0 caught: CardMissing + long-and-buzz
@@ -125,8 +125,7 @@ clock not set alone: runs, so chirps         -> 1 segment(s), 0 caught: ClockNot
 sensor missing alone: runs, so chirps        -> 1 segment(s), 0 caught: SensorMissing + chirp
 no schedule alone: cannot run                -> 1 segment(s), 0 caught: NoSchedule (no chirp)
 no card AND no schedule: none outranks       -> 2 segment(s), 0 caught: CardMissing NoSchedule (no chirp)
-on backup power alone                        -> 1 segment(s), 1 caught: OnBackupPower + chirp on backup (3 shorts)
-on backup AND card missing: warning wins     -> 2 segment(s), 1 caught: CardMissing OnBackupPower + long-and-buzz
-on backup AND clock not set                  -> 2 segment(s), 1 caught: ClockNotSet OnBackupPower + chirp on backup (3 shorts)
+on backup power alone: counted, chirp unchanged -> 1 segment(s), 1 caught: OnBackupPower + chirp
+on backup AND card missing                   -> 2 segment(s), 1 caught: CardMissing OnBackupPower + long-and-buzz
 card write failed and BME missing            -> 2 segment(s), 1 caught: CardWriteFailed BME280Missing + long-and-buzz
 every set: 1048576 checked, 0 broke a rule
