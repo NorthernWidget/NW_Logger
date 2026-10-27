@@ -615,11 +615,15 @@ void NW_Logger::showVerdict() {
   chirp(form);
 }
 
+uint32_t NW_Logger::chirpColour() {
+  return BLUE;  //A board that knows its battery overrides this (Okapi): blue good, purple middling, red low
+}
+
 void NW_Logger::chirp(uint8_t form) {
   //ALog's LEDgood(), long-short-short, its own length and not the window's.
-  //Blue until the battery colour is built (QUEUE: "Battery state is the
-  //chirp's colour"); the long is where that colour will go.
-  LED_Color(BLUE);
+  //The colour is the battery's, from chirpColour() (Andy, 2026-10-22).
+  uint32_t colour = chirpColour();
+  LED_Color(colour);
   delay(1000);
   LED_Color(OFF);
   delay(300);
@@ -635,13 +639,16 @@ void NW_Logger::chirp(uint8_t form) {
     }
     return;
   }
-  LED_Color(BLUE);
-  delay(100);
-  LED_Color(OFF);
-  delay(100);
-  LED_Color(BLUE);
-  delay(100);
-  LED_Color(OFF);
+  //Two shorts, or three when the backup battery is carrying the logger: the
+  //extra beat says "one more thing", and the colour is then the backup's
+  //(Andy, 2026-10-27).
+  uint8_t shorts = (form == NW_CHIRP_BACKUP) ? 3 : 2;
+  for (uint8_t i = 0; i < shorts; i++) {
+    LED_Color(colour);
+    delay(100);
+    LED_Color(OFF);
+    if (i + 1 < shorts) delay(100);
+  }
 }
 
 void NW_Logger::signal(uint8_t message, uint8_t caught) {

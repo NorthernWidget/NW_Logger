@@ -445,10 +445,20 @@ protected:
   void raise(uint8_t message);
 
   /**
-     * @brief The chirp, in one of its forms: long-short-short, or long then the card's fast pulses.
+     * @brief The chirp, in one of its forms: long-short-short; long then the card's fast pulses; long and three shorts on the backup battery.
      * @param form an NW_Chirp value other than NW_CHIRP_NONE, from nwChirpForm()
      */
   virtual void chirp(uint8_t form);
+
+  /**
+     * @brief The chirp's colour: the battery's state, when the board knows it.
+     * @details Blue by default, which is "all well" on a board that cannot judge its
+     * battery. A board that can (Okapi, from the PAC1934) answers blue for good,
+     * purple for middling and red for low, judging the backup when the main battery
+     * is absent. The chirp is only ever seen at start-up with a person present, so red
+     * here means "swap before you leave" and does not clash with the fault patterns.
+     */
+  virtual uint32_t chirpColour();
 
   /// @brief The raised message of the highest band, or NW_MSG_READY when nothing is wrong.
   uint8_t worstMessage();
