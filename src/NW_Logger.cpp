@@ -615,6 +615,10 @@ void NW_Logger::showVerdict() {
   chirp(form);
 }
 
+uint32_t NW_Logger::rowBlipColour() {
+  return BLUE;  //Okapi answers GOLD while the backup pack is carrying the logger
+}
+
 uint32_t NW_Logger::chirpColour() {
   return BLUE;  //A board that knows its battery overrides this (Okapi): blue good, purple middling, red low
 }
@@ -995,8 +999,10 @@ int NW_Logger::logRow() {
   _note[0] = '\0';  //One row's worth of notes, kept or not; it does not accumulate
 
   if (written) {
-    //A row reached the card: one short blip, in the colour that means all well.
-    LED_Color(BLUE);
+    //A row reached the card: one short blip, in the colour that means all well,
+    //or in the colour of the power source on a board that has more than one
+    //(Okapi: blue on the rechargeable pack, amber on the backup; Andy, 2026-10-28).
+    LED_Color(rowBlipColour());
     delay(20);
     LED_Color(OFF);
   }

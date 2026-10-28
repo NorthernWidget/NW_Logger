@@ -460,6 +460,15 @@ protected:
      */
   virtual uint32_t chirpColour();
 
+  /**
+     * @brief The colour of the 20 ms blip per row written: blue, or the power source's on a board with more than one.
+     * @details Margay has one pack and blips blue, the colour that means all well.
+     * Okapi blips blue on the rechargeable pack and amber on the backup, so the
+     * one light the field ever shows also says which pack is carrying the logger,
+     * at no cost beyond the blip it already makes (Andy, 2026-10-28).
+     */
+  virtual uint32_t rowBlipColour();
+
   /// @brief The raised message of the highest band, or NW_MSG_READY when nothing is wrong.
   uint8_t worstMessage();
 
