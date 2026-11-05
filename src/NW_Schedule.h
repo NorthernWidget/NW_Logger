@@ -148,7 +148,7 @@ inline uint32_t nwBackupWake(uint32_t next, uint32_t step) {
 /**
  * @brief A step this board can actually keep.
  * @param step the logging interval, in seconds
- * @param wdtSeconds the watchdog's period, from the hardware (Margay: a 100k resistor on the TPL5010's DELAY pin); **0 when there is no watchdog or its period is not known**
+ * @param wdtSeconds the watchdog's period, from the hardware (Margay: the resistor on the TPL5010's DELAY pin, 130 kΩ on v3.0 and 100 kΩ on v2.x); **0 when there is no watchdog or its period is not known**
  * @param cycleSeconds how long a logging cycle takes, measured by the logger
  * @param guard the arming lead, NW_ALARM_GUARD_SECONDS unless measured otherwise
  * @return true when the schedule holds
