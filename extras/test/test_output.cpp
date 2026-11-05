@@ -174,6 +174,11 @@ static void schedule() {
   printf("            a 900 s interval with a 5000 s cycle -> none: %d\n",
          nwLengthenStep(900, 5000, 4200) == NW_SCHEDULE_NONE);
   printf("            the same 5000 s cycle, no watchdog   -> %lu s\n", (unsigned long)nwLengthenStep(900, 5000, 0));
+  printf("lengthen: Margay's two watchdog periods, an hourly interval with a 2 s cycle\n");
+  printf("            v3.0, R10 = 130 k, 3853 s -> holds %d, keeps %lu s\n",
+         nwScheduleHolds(3600, 3853, 2), (unsigned long)nwLengthenStep(3600, 2, 3853));
+  printf("            v2.x, R10 = 100 k, 2110 s -> holds %d, none: %d\n",
+         nwScheduleHolds(3600, 2110, 2), nwLengthenStep(3600, 2, 2110) == NW_SCHEDULE_NONE);
 }
 
 // The message table, every row: the enum's order and the table's must agree, and

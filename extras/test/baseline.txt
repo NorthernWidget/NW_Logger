@@ -69,6 +69,9 @@ lengthen: the watchdog's ceiling, at 4200 s
             a 900 s interval with a 1000 s cycle -> 1200 s
             a 900 s interval with a 5000 s cycle -> none: 1
             the same 5000 s cycle, no watchdog   -> 7200 s
+lengthen: Margay's two watchdog periods, an hourly interval with a 2 s cycle
+            v3.0, R10 = 130 k, 3853 s -> holds 1, keeps 3600 s
+            v2.x, R10 = 100 k, 2110 s -> holds 0, none: 1
 
 -- the messages --
  0  fine    Ready
